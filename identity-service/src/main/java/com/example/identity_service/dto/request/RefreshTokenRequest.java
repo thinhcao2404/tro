@@ -1,0 +1,15 @@
+package com.example.identity_service.dto.request;
+
+import jakarta.validation.constraints.NotBlank;
+import lombok.*;
+import lombok.experimental.FieldDefaults;
+
+@Data
+@FieldDefaults(level = AccessLevel.PRIVATE)
+@NoArgsConstructor
+@AllArgsConstructor
+public class RefreshTokenRequest {
+
+    @NotBlank(message = "Refresh token không được để trống")
+    String refreshToken;
+}
