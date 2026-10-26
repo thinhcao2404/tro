@@ -1,5 +1,6 @@
 package com.example.property_service.entity;
 
+import com.example.property_service.enums.RoomStatus;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import lombok.*;
@@ -29,9 +30,9 @@ public class Room {
     @Column(name = "price", nullable = false, precision = 12, scale = 2)
     BigDecimal price;
 
-    @Column(name = "status", nullable = false, length = 20)
-    @Builder.Default
-    String status = "AVAILABLE";
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false)
+    private RoomStatus status;
 
     @Column(name = "description", length = 255)
     String description;

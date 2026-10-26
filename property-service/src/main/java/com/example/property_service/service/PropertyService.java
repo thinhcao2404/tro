@@ -3,6 +3,7 @@ package com.example.property_service.service;
 import com.example.property_service.dto.request.RoomRequest;
 import com.example.property_service.dto.response.PageResponse;
 import com.example.property_service.entity.Room;
+import com.example.property_service.enums.RoomStatus;
 import com.example.property_service.exception.BadRequestException;
 import com.example.property_service.exception.ResourceNotFoundException;
 import com.example.property_service.mapper.PropertyMapper;
@@ -23,11 +24,16 @@ import java.util.Map;
 public class PropertyService {
     @Autowired
     private PropertyMapper propertyMapper;
+
     @Autowired
     private PropertyRepository propertyRepository;
 
     public void deleteRoom(Long id) {
-        propertyRepository.deleteById(id);
+        Room room = propertyRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy phòng."));
+        if(room.getStatus() != RoomStatus.AVAILABLE){
+            propertyRepository.deleteById(id);
+        }
     }
 
     public Room createRoom(RoomRequest request) throws ResourceNotFoundException {
@@ -43,7 +49,7 @@ public class PropertyService {
 
     public Room updateStatus(Long id,RoomRequest request) throws ResourceNotFoundException {
         Room room = findRoomById(id);
-        room.setStatus(request.getStatus().toUpperCase());
+        room.setStatus(request.getStatus());
         return propertyRepository.save(room);
     }
 
@@ -65,11 +71,11 @@ public class PropertyService {
 
             if (status != null && !(status instanceof String)) {
                 throw new BadRequestException(
-                        "Status phải là chuỗi"
+                        "Status không hợp lệ."
                 );
             }
 
-            room.setStatus((String) status);
+            room.setStatus((RoomStatus) status);
         }
 
         if (updates.containsKey("price")) {
@@ -151,7 +157,6 @@ public class PropertyService {
         // Database lọc, sắp xếp và phân trang
         Page<Room> roomPage = propertyRepository.findAll(spec, pageable);
 
-        // Chuyển sang response dùng chung
         return PageResponseUtil.from(roomPage);
     }
 }

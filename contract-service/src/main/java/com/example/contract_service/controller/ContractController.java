@@ -2,10 +2,18 @@ package com.example.contract_service.controller;
 
 import com.example.contract_service.dto.*;
 import com.example.contract_service.dto.response.ContractResponse;
+import com.example.contract_service.dto.response.PageResponse;
+import com.example.contract_service.entity.ContractAgreement;
+import com.example.contract_service.exception.BadRequestException;
 import com.example.contract_service.service.ContractService;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+
+import java.math.BigDecimal;
 
 
 @RestController
@@ -24,6 +32,38 @@ public class ContractController {
     public ResponseEntity<Boolean> getActiveContract(@RequestParam("tenantId") Long tenantId){
        boolean hasActive = contractService.hasActiveContract(tenantId);
        return ResponseEntity.ok(hasActive);
+    }
+
+    @GetMapping
+    public ResponseEntity<PageResponse<ContractAgreement>> getContracts(
+            @RequestParam(required = false)  String search,
+            @RequestParam(required = false)  String status,
+            @RequestParam(required = false)  BigDecimal deposit,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "4") int size,
+            @RequestParam(defaultValue = "id,asc") String sort) {
+        PageResponse<ContractAgreement> response = contractService.getContracts(search, status, deposit, page, size, sort);
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/my-contract")
+    @PreAuthorize("hasRole('TENANT')")
+    public ResponseEntity<ContractResponse> getMyContract(@AuthenticationPrincipal Jwt jwt) {
+        Long tenantId = jwt.getClaim("tenantId");
+        if (tenantId == null) {
+            throw new BadRequestException("Token không chứa thông tin tenantId.");
+        }
+        ContractResponse response = contractService.getContractByTenantId(tenantId);
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/tenant/{requestedTenantId}")
+    @PreAuthorize("hasRole('LANDLORD')")
+    public ResponseEntity<ContractResponse> getContractByTenantId(
+            @PathVariable Long requestedTenantId) {
+
+        ContractResponse response = contractService.getContractByTenantId(requestedTenantId);
+        return ResponseEntity.ok(response);
     }
 
 
