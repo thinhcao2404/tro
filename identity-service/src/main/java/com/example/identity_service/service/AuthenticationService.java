@@ -17,24 +17,24 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Service
 public class AuthenticationService {
     @Autowired
-    public IdentifyRepository identifyRepository;
+    private IdentifyRepository identifyRepository;
     @Autowired
-    public PasswordEncoder passwordEncoder;
+    private PasswordEncoder passwordEncoder;
     @Autowired
-    public IdentifyMapper  identifyMapper;
+    private IdentifyMapper  identifyMapper;
     @Autowired
-    public JwtTokenProvider jwtTokenProvider;
+    private JwtTokenProvider jwtTokenProvider;
     @Autowired
-    public RefeshTokeRepository  refeshTokeRepository;
+    private RefeshTokeRepository  refeshTokeRepository;
 
     @Transactional
     public AuthResponse login(LoginRequest request){
+
         SysAccount sysAccount = identifyRepository.findByUsername(request.getUsername())
                 .orElseThrow(()-> new BadRequestException("Tên đăng nhập hoặc mật khẩu không chính xác. Vui lòng thử lại"));
         boolean isPasswordMatched = passwordEncoder.matches(request.getPassword(),sysAccount.getPasswordHash());

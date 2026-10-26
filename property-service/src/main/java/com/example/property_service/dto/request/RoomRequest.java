@@ -1,5 +1,9 @@
 package com.example.property_service.dto.request;
 
+import com.example.property_service.enums.RoomStatus;
+import jakarta.persistence.Column;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.validation.constraints.*;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
@@ -29,7 +33,8 @@ public class RoomRequest {
 
     @NotBlank(message = "Trạng thái không được để trống")
     @Pattern(regexp = "^(AVAILABLE|OCCUPIED|MAINTENANCE)$", message = "Trạng thái chỉ có thể là AVAILABLE, OCCUPIED hoặc MAINTENANCE")
-    String status;
+    @Enumerated(EnumType.STRING)
+    private RoomStatus status;
 
     String description;
 }

@@ -1,9 +1,10 @@
 package com.example.identity_service.security;
 
 import com.example.identity_service.entity.SysAccount;
-import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.SignatureAlgorithm;
+import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
+import io.jsonwebtoken.security.SignatureException;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -12,6 +13,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Date;
 
 @Component
+@Slf4j
 public class JwtTokenProvider {
     @Value("${jwt.secret}")
     private String jwtSecret;
@@ -34,6 +36,7 @@ public class JwtTokenProvider {
                 .setSubject(sysAccount.getUsername())
                 .claim("accountId", sysAccount.getId())
                 .claim("role", sysAccount.getRole().name())
+                .claim("tenantId", sysAccount.getTenantId())
                 .setIssuedAt(now)
                 .setExpiration(expiryDate)
                 .signWith(getSigningKey(), SignatureAlgorithm.HS256)
@@ -56,4 +59,5 @@ public class JwtTokenProvider {
     public long getRefreshTokenExpirationMs() {
         return jwtRefreshTokenExpirationMs;
     }
+
 }

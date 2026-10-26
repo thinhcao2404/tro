@@ -8,4 +8,5 @@ import java.util.Optional;
 
 public interface PropertyRepository extends JpaRepository<Room,Long>, JpaSpecificationExecutor<Room> {
     Optional<Room> findById(Long id);
+
 }
