@@ -36,4 +36,11 @@ public class AccountController {
         accountService.updateTenantAccount(request);
         return ResponseEntity.ok().build();
     }
+
+    @DeleteMapping("/{tenantId}")
+    public ResponseEntity<Void> deleteTenantAccount(@PathVariable("tenantId") Long id) {
+        accountService.deleteTenantAccount(id);
+        return ResponseEntity.noContent().build();
+    }
+
 }

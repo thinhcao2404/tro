@@ -38,5 +38,5 @@ public class TenantProfile {
     LocalDateTime createdAt;
 
     @Column(name = "is_deleted", nullable = false)
-    private boolean isDeleted = false;
+    boolean isDeleted = false;
 }

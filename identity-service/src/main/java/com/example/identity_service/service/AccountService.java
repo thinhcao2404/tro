@@ -56,4 +56,11 @@ public class AccountService {
         identifyRepository.save(account);
     }
 
+    @Transactional
+    public void deleteTenantAccount(Long id) throws ResourceNotFoundException {
+        SysAccount account = identifyRepository.findByTenantId(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Tài khoản không tồn tại"));
+        account.setIsActive(false);
+        identifyRepository.save(account);
+    }
 }

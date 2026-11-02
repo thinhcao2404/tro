@@ -1,5 +1,6 @@
 package com.example.contract_service.service;
 
+import com.example.contract_service.dto.request.ContractCreateRequest;
 import com.example.contract_service.dto.response.ContractResponse;
 import com.example.contract_service.dto.response.PageResponse;
 import com.example.contract_service.entity.ContractAgreement;
@@ -17,6 +18,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,6 +30,7 @@ import org.springframework.web.client.RestClientResponseException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
 
 @Service
 public class ContractService {
@@ -140,7 +143,7 @@ public class ContractService {
                     .retrieve()
                     .toBodilessEntity();
         } catch (ResourceAccessException e) {
-            throw new ServiceUnavailableException("Dịch vụ quản lý phòng (property-service) hiện không khả dụng. Vui lòng thử lại sau.");
+            throw new ServiceUnavailableException("Dịch vụ quản lý phòng hiện không khả dụng. Vui lòng thử lại sau.");
         } catch (RestClientResponseException e) {
             throw new ExternalServiceException("Lỗi phản hồi từ property-service: " + e.getResponseBodyAsString());
         } catch (RestClientException e) {
@@ -152,5 +155,40 @@ public class ContractService {
     @Transactional(readOnly = true)
     public boolean hasActiveContract(Long id){
         return contractRepository.existsByTenantIdAndStatus(id,ContractStatus.ACTIVE);
+    }
+
+    @Transactional
+    public ContractResponse createContract(ContractCreateRequest contractCreateRequest){
+        Boolean isAvailable = false;
+        try{
+            isAvailable = restClient.get()
+                    .uri("/api/v1/rooms/check-status/{id}", contractCreateRequest.getRoomId())
+                    .retrieve()
+                    .body(Boolean.class);
+        } catch (ResourceAccessException e) {
+            throw new ServiceUnavailableException("Dịch vụ quản lý phòng hiện không khả dụng. Vui lòng thử lại sau.");
+        } catch (RestClientResponseException e) {
+            throw new ExternalServiceException("Lỗi phản hồi từ property-service: " + e.getResponseBodyAsString());
+        } catch (RestClientException e) {
+            throw new ExternalServiceException("Lỗi giao tiếp với dịch vụ quản lý phòng");
+        }
+        if(!Boolean.TRUE.equals(isAvailable)){
+            throw new BadRequestException("Phòng này hiện không sẵn sàng hoặc đã có người thuê.");
+        }
+        ContractAgreement contractAgreement = contractMapper.contractToContractAgreement(contractCreateRequest);
+        contractAgreement.setStatus(ContractStatus.ACTIVE);
+        ContractAgreement savedContract = contractRepository.save(contractAgreement);
+
+        try {
+            restClient.patch()
+                    .uri("/api/v1/rooms/{roomId}/status", contractAgreement.getRoomId())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(Map.of("status", "OCCUPIED"))
+                    .retrieve()
+                    .toBodilessEntity();
+        } catch (Exception e){
+            throw new ExternalServiceException("Không thể cập nhật trạng thái phòng sang OCCUPIED: " + e.getMessage());
+        }
+        return contractMapper.contractToContractResponse(savedContract);
     }
 }

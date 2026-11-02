@@ -5,6 +5,8 @@ import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
+import org.hibernate.annotations.SQLDelete;
+import org.hibernate.annotations.SQLRestriction;
 
 import java.math.BigDecimal;
 
@@ -14,6 +16,8 @@ import java.math.BigDecimal;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@SQLDelete(sql = "UPDATE prop_rooms SET is_deleted = true WHERE id = ?")
+@SQLRestriction("is_deleted = false")
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class Room {
 
@@ -37,4 +41,7 @@ public class Room {
     @Column(name = "description", length = 255)
     String description;
 
+    @Column(name = "is_deleted", nullable = false)
+    @Builder.Default
+    private Boolean isDeleted = false;
 }

@@ -30,7 +30,7 @@ public class AuthenticationService {
     @Autowired
     private JwtTokenProvider jwtTokenProvider;
     @Autowired
-    private RefeshTokeRepository  refeshTokeRepository;
+    private RefeshTokeRepository  refeshTokenRepository;
 
     @Transactional
     public AuthResponse login(LoginRequest request){
@@ -55,18 +55,34 @@ public class AuthenticationService {
 
     @Transactional
     public TokenRefreshResponse refreshToken(RefreshTokenRequest request){
-        RefreshToken refreshToken = refeshTokeRepository.findByToken(request.getRefreshToken())
+        if (!jwtTokenProvider.validateToken(request.getRefreshToken())) {
+            throw new BadRequestException("Refresh Token bị lỗi cấu trúc hoặc chữ ký không hợp lệ.");
+        }
+
+        String usernameFromToken = jwtTokenProvider.getUsernameFromToken(request.getRefreshToken());
+
+        RefreshToken refreshToken = refeshTokenRepository.findByToken(request.getRefreshToken())
                 .orElseThrow(()-> new BadRequestException("Refresh Token không hợp lệ hoặc không tồn tại"));
 
+        if (Boolean.TRUE.equals(refreshToken.getIsRevoked())) {
+            throw new BadRequestException("Refresh Token đã bị thu hồi. Vui lòng đăng nhập lại.");
+        }
+
         if(refreshToken.getExpiryDate().isBefore(Instant.now())){
-            refeshTokeRepository.delete(refreshToken);
+            refeshTokenRepository.delete(refreshToken);
             throw new BadRequestException("Refresh Token đã hết hạn.");
         }
 
         SysAccount sysAccount = refreshToken.getAccount();
+
+        if (!sysAccount.getUsername().equals(usernameFromToken)) {
+            throw new BadRequestException("Thông tin định danh trong Refresh Token không hợp lệ.");
+        }
+
         String newAccessToken = jwtTokenProvider.generateAccessToken(sysAccount);
         String newRefreshToken = jwtTokenProvider.generateRefreshToken(sysAccount);
 
+        refeshTokenRepository.delete(refreshToken);
         saveRefreshToken(sysAccount,newRefreshToken);
 
         return TokenRefreshResponse.builder()
@@ -76,7 +92,7 @@ public class AuthenticationService {
     }
 
     private void saveRefreshToken(SysAccount sysAccount,String refreshToken){
-        refeshTokeRepository.deleteByAccount(sysAccount);
+        refeshTokenRepository.deleteByAccount(sysAccount);
 
         RefreshToken newRefreshToken = RefreshToken.builder()
                 .account(sysAccount)
@@ -85,6 +101,15 @@ public class AuthenticationService {
                 .createdAt(LocalDateTime.now())
                 .expiryDate(Instant.now().plusMillis(jwtTokenProvider.getRefreshTokenExpirationMs()))
                 .build();
-        refeshTokeRepository.save(newRefreshToken);
+        refeshTokenRepository.save(newRefreshToken);
+    }
+
+    @Transactional
+    public void logout(String refreshTokenStr){
+        RefreshToken refreshToken = refeshTokenRepository.findByToken(refreshTokenStr)
+                .orElseThrow(() -> new BadRequestException("Refresh Token không hợp lệ."));
+
+        refreshToken.setIsRevoked(true);
+        refeshTokenRepository.save(refreshToken);
     }
 }
