@@ -31,9 +31,16 @@ public class PropertyService {
     public void deleteRoom(Long id) {
         Room room = propertyRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy phòng."));
-        if(room.getStatus() != RoomStatus.AVAILABLE){
-            propertyRepository.deleteById(id);
+        if(room.getStatus() == RoomStatus.OCCUPIED){
+            throw new BadRequestException("Không thể xóa phòng đang có khách thuê. Vui lòng thanh lý hợp đồng trước.");
         }
+        propertyRepository.deleteById(id);
+    }
+
+    public boolean checkStatus(Long id){
+        Room room = propertyRepository.findById(id)
+                .orElseThrow(()-> new ResourceNotFoundException("Không tìm thấy phòng."));
+        return room.getStatus() == RoomStatus.AVAILABLE;
     }
 
     public Room createRoom(RoomRequest request) throws ResourceNotFoundException {

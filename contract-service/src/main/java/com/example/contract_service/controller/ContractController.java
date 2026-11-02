@@ -1,11 +1,13 @@
 package com.example.contract_service.controller;
 
 import com.example.contract_service.dto.*;
+import com.example.contract_service.dto.request.ContractCreateRequest;
 import com.example.contract_service.dto.response.ContractResponse;
 import com.example.contract_service.dto.response.PageResponse;
 import com.example.contract_service.entity.ContractAgreement;
 import com.example.contract_service.exception.BadRequestException;
 import com.example.contract_service.service.ContractService;
+import jakarta.validation.Valid;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -23,8 +25,16 @@ public class ContractController {
     private ContractService contractService;
 
     @PatchMapping("/{id}/checkout")
+    @PreAuthorize("hasRole('LANDLORD')")
     public ResponseEntity<ContractResponse> cancelContract(@PathVariable Long id){
         ContractResponse response = contractService.cancelContract(id);
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/checkin")
+    @PreAuthorize("hasRole('LANDLORD')")
+    public ResponseEntity<ContractResponse> createContract(@Valid @RequestBody ContractCreateRequest contractCreateRequest){
+        ContractResponse response = contractService.createContract(contractCreateRequest);
         return ResponseEntity.ok(response);
     }
 

@@ -4,6 +4,7 @@ import com.example.tenant_service.dto.response.ErrorResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -15,6 +16,7 @@ import java.util.Map;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> handleValidationExceptions(
             MethodArgumentNotValidException ex, HttpServletRequest request) {
@@ -33,6 +35,19 @@ public class GlobalExceptionHandler {
         response.setValidationErrors(errors);
 
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ErrorResponse> handleAccessDeniedException(
+            AccessDeniedException ex, HttpServletRequest request) {
+
+        ErrorResponse response = new ErrorResponse(
+                HttpStatus.FORBIDDEN.value(),
+                "Forbidden",
+                "Bạn không có quyền truy cập hoặc thực hiện thao tác trên tài nguyên này.",
+                request.getRequestURI()
+        );
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
     }
 
     @ExceptionHandler(ResourceNotFoundException.class)
@@ -60,16 +75,29 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
     }
 
-    @ExceptionHandler(ResourceAccessException.class)
+    @ExceptionHandler({ResourceAccessException.class, ServiceUnavailableException.class})
     public ResponseEntity<ErrorResponse> handleResourceAccessException(
             ResourceAccessException ex, HttpServletRequest request) {
         ErrorResponse response = new ErrorResponse(
                 HttpStatus.SERVICE_UNAVAILABLE.value(),
                 "Service Unavailable",
-                "Hệ thống xác thực hiện không khả dụng. Giao dịch đã được hủy bỏ.",
+                ex.getMessage() != null ? ex.getMessage() : "Một trong các dịch vụ liên kết hiện không khả dụng. Vui lòng thử lại sau.",
                 request.getRequestURI()
         );
         return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(response);
+    }
+
+    @ExceptionHandler(ExternalServiceException.class)
+    public ResponseEntity<ErrorResponse> handleExternalServiceException(
+            ExternalServiceException ex, HttpServletRequest request) {
+
+        ErrorResponse response = new ErrorResponse(
+                HttpStatus.BAD_GATEWAY.value(),
+                "Bad Gateway",
+                ex.getMessage(),
+                request.getRequestURI()
+        );
+        return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(response);
     }
 
     @ExceptionHandler(Exception.class)

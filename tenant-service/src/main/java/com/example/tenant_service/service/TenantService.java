@@ -3,17 +3,29 @@ package com.example.tenant_service.service;
 import com.example.tenant_service.dto.request.CreateTenantAccountRequest;
 import com.example.tenant_service.dto.request.TenantRequest;
 import com.example.tenant_service.dto.request.UpdateTenantAccountRequest;
+import com.example.tenant_service.dto.response.PageResponse;
 import com.example.tenant_service.dto.response.TenantResponse;
 import com.example.tenant_service.entity.TenantProfile;
 import com.example.tenant_service.exception.BadRequestException;
+import com.example.tenant_service.exception.ExternalServiceException;
 import com.example.tenant_service.exception.ResourceNotFoundException;
+import com.example.tenant_service.exception.ServiceUnavailableException;
 import com.example.tenant_service.mapper.TenantMapper;
 import com.example.tenant_service.repository.TenantRepository;
+import com.example.tenant_service.util.PageResponseUtil;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
+
 
 @Service
 public class TenantService {
@@ -24,7 +36,88 @@ public class TenantService {
     private TenantMapper tenantMapper;
 
     @Autowired
-    private RestClient restClient;
+    private RestClient contractRestClient;
+
+    @Autowired
+    private RestClient identityRestClient;
+
+    public PageResponse<TenantProfile> getTenants(
+            String search,
+            String phone,
+            String identityNumber,
+            Boolean isDeleted,
+            int page,
+            int size,
+            String sort) {
+
+        if (page < 0 || size <= 0) {
+            throw new BadRequestException(
+                    "Page phải >= 0 và size phải > 0"
+            );
+        }
+
+        // Xây dựng điều kiện lọc
+        Specification<TenantProfile> spec = (root, query, cb) ->
+                cb.conjunction();
+
+        if (search != null && !search.isBlank()) {
+            String keyword = "%" + search.trim().toLowerCase() + "%";
+
+            spec = spec.and((root, query, cb) ->
+                    cb.like(
+                            cb.lower(root.get("fullName")),
+                            keyword
+                    )
+            );
+        }
+
+        if (phone != null && !phone.isBlank()) {
+            spec = spec.and((root, query, cb) ->
+                    cb.equal(
+                            cb.lower(root.get("phone")),
+                            phone.trim().toLowerCase()
+                    )
+            );
+        }
+
+        if (identityNumber != null ) {
+            spec = spec.and((root, query, cb) ->
+                    cb.equal(root.get("identityNumber"), identityNumber)
+            );
+        }
+
+        if (isDeleted != null) {
+            spec = spec.and((root, query, cb) ->
+                    cb.equal(root.get("isDeleted"), isDeleted)
+            );
+        }
+
+        // Xác định trường sắp xếp
+        String[] sortParams = sort.split(",");
+        String sortField = sortParams[0].trim();
+
+        // Chỉ cho phép các trường được hỗ trợ
+        sortField = switch (sortField) {
+            case "search", "phone", "identityNumber", "id" -> sortField;
+            default -> "id";
+        };
+
+        Sort.Direction direction =
+                sortParams.length > 1
+                        && "desc".equalsIgnoreCase(sortParams[1].trim())
+                        ? Sort.Direction.DESC
+                        : Sort.Direction.ASC;
+
+        Sort sorting = Sort.by(direction, sortField);
+
+        // Tạo thông tin phân trang
+        Pageable pageable = PageRequest.of(page, size, sorting);
+
+        // Database lọc, sắp xếp và phân trang
+        Page<TenantProfile> roomPage = tenantRepository.findAll(spec, pageable);
+
+        return PageResponseUtil.from(roomPage);
+    }
 
     @Transactional
     public TenantResponse updateTenant(Long id,TenantRequest request) {
@@ -48,8 +141,8 @@ public class TenantService {
                     .oldUsername(oldUserName)
                     .build();
 
-            restClient.put()
-                    .uri("http://localhost:8080/api/v1/accounts/tenants")
+            identityRestClient.put()
+                    .uri("/api/v1/accounts/tenants")
                     .body(updateTenantAccountRequest)
                     .retrieve()
                     .onStatus(HttpStatusCode::is4xxClientError, (req, res) -> {
@@ -71,15 +164,27 @@ public class TenantService {
     @Transactional
     public void deleteTenant(Long id) throws ResourceNotFoundException {
         TenantProfile tenant = findTenantById(id);
-        boolean hasActiveContract = restClient
-                .get()
-                .uri("/api/v1/contracts/check-out?tenantId={tenantId}",id)
-                .retrieve()
-                .body(Boolean.class);
-        if (Boolean.TRUE.equals(hasActiveContract)) {
-            throw new BadRequestException("Khách hàng này còn hợp đồng.");
+        try{
+            Boolean hasActiveContract = contractRestClient.get()
+                    .uri("/api/v1/contracts/check-active?tenantId={tenantId}",id)
+                    .retrieve()
+                    .body(Boolean.class);
+            if (Boolean.TRUE.equals(hasActiveContract)) {
+                throw new BadRequestException("Không thể xóa: Khách thuê này hiện vẫn còn hợp đồng đang hoạt động.");
+            }
+
+            identityRestClient.delete()
+                    .uri("/api/v1/accounts/{tenantId}",id)
+                    .retrieve()
+                    .toBodilessEntity();
+
+            tenant.setDeleted(true);
+
+        }catch (ResourceAccessException e) {
+            throw new ServiceUnavailableException("Không thể kết nối đến hệ thống liên kết . Vui lòng thử lại sau.");
+        }catch (RestClientResponseException e){
+            throw new ExternalServiceException("Lỗi phản hồi từ dịch vụ liên kết: " + e.getResponseBodyAsString());
         }
-        tenantRepository.delete(tenant);
     }
 
     @Transactional
@@ -99,8 +204,8 @@ public class TenantService {
                 .fullName(savedTenant.getFullName())
                 .build();
 
-        restClient.post()
-                .uri("http://localhost:8080/api/v1/accounts/tenants")
+        identityRestClient.post()
+                .uri("/api/v1/accounts/tenants")
                 .body(accountRequest)
                 .retrieve()
                 .onStatus(HttpStatusCode::is4xxClientError, (req, res) -> {

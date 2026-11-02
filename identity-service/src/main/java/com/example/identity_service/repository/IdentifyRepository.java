@@ -10,4 +10,7 @@ import java.util.Optional;
 public interface IdentifyRepository extends JpaRepository<SysAccount,Long> {
     boolean existsByUsername(String username);
     Optional<SysAccount> findByUsername(String username);
+
+
+    Optional<SysAccount> findByTenantId(Long id);
 }

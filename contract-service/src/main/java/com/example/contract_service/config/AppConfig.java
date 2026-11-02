@@ -5,6 +5,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.client.RestClient;
 
 import java.time.Duration;
@@ -25,8 +28,14 @@ public class AppConfig {
         factory.setReadTimeout(Duration.ofSeconds(3));
 
         return RestClient.builder()
-                .requestFactory(factory)
                 .baseUrl(baseUrl)
+                .requestInterceptor((request, body, execution) -> {
+                    Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+                    if (auth != null && auth.getPrincipal() instanceof Jwt jwt) {
+                        request.getHeaders().setBearerAuth(jwt.getTokenValue());
+                    }
+                    return execution.execute(request, body);
+                })
                 .build();
     }
 }
