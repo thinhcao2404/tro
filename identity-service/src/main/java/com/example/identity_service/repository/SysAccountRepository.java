@@ -7,7 +7,7 @@ import org.springframework.stereotype.Repository;
 import java.util.Optional;
 
 @Repository
-public interface IdentifyRepository extends JpaRepository<SysAccount,Long> {
+public interface SysAccountRepository extends JpaRepository<SysAccount,Long> {
     boolean existsByUsername(String username);
     Optional<SysAccount> findByUsername(String username);
 

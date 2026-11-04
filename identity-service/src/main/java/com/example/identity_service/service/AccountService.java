@@ -7,7 +7,8 @@ import com.example.identity_service.enums.Role;
 import com.example.identity_service.exception.BadRequestException;
 import com.example.identity_service.exception.ResourceNotFoundException;
 import com.example.identity_service.mapper.IdentifyMapper;
-import com.example.identity_service.repository.IdentifyRepository;
+import com.example.identity_service.repository.SysAccountRepository;
+import com.example.identity_service.repository.RefreshTokenRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -18,7 +19,10 @@ import java.util.UUID;
 @Service
 public class AccountService {
     @Autowired
-    private IdentifyRepository identifyRepository;
+    private SysAccountRepository sysAccountRepository;
+
+    @Autowired
+    private RefreshTokenRepository refreshTokenRepository;
 
     @Autowired
     private IdentifyMapper identifyMapper;
@@ -28,7 +32,7 @@ public class AccountService {
 
     @Transactional
     public String createTenantAccount(CreateTenantAccountRequest request) {
-        if (identifyRepository.existsByUsername(request.getUsername())) {
+        if (sysAccountRepository.existsByUsername(request.getUsername())) {
             throw new BadRequestException("Tên đăng nhập đã tồn tại.");
         }
 
@@ -39,7 +43,7 @@ public class AccountService {
         String tempPassword = UUID.randomUUID().toString().substring(0, 8);
         sysAccount.setPasswordHash(passwordEncoder.encode(tempPassword));
 
-        identifyRepository.save(sysAccount);
+        sysAccountRepository.save(sysAccount);
 
         return tempPassword;
     }
@@ -47,20 +51,25 @@ public class AccountService {
     @Transactional
     public void updateTenantAccount(UpdateTenantAccountRequest request) {
 
-        SysAccount account = identifyRepository.findByUsername(request.getOldUsername())
+        SysAccount account = sysAccountRepository.findByUsername(request.getOldUsername())
                 .orElseThrow(() -> new ResourceNotFoundException("Tài khoản không tồn tại"));
 
+        if (!request.getOldUsername().equals(request.getUsername())
+                && sysAccountRepository.existsByUsername(request.getUsername())) {
+            throw new BadRequestException("Tên đăng nhập mới đã được sử dụng bởi tài khoản khác.");
+        }
         account.setFullName(request.getFullName());
         account.setUsername(request.getUsername());
 
-        identifyRepository.save(account);
+        sysAccountRepository.save(account);
     }
 
     @Transactional
     public void deleteTenantAccount(Long id) throws ResourceNotFoundException {
-        SysAccount account = identifyRepository.findByTenantId(id)
+        SysAccount account = sysAccountRepository.findByTenantId(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Tài khoản không tồn tại"));
         account.setIsActive(false);
-        identifyRepository.save(account);
+        sysAccountRepository.save(account);
+        refreshTokenRepository.deleteByAccount(account);
     }
 }

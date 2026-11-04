@@ -18,7 +18,6 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,8 +28,8 @@ import org.springframework.web.client.RestClientResponseException;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ExecutionException;
 
 @Service
 public class ContractService {
@@ -43,19 +42,16 @@ public class ContractService {
 
     public ContractAgreement  findContractAgreementById(Long id) throws ResourceNotFoundException {
         return contractRepository.findById(id).
-                orElseThrow(() -> new ResourceNotFoundException(
-                        "Không tìm thấy hợp đồng với ID: " + id
-                ));
+                orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy hợp đồng với ID: " + id));
     }
 
-    public ContractResponse getContractByTenantId(Long tenantId) {
-        ContractAgreement contract = contractRepository.findByTenantIdAndStatus(tenantId, ContractStatus.ACTIVE)
-                .orElseThrow(() -> new ResourceNotFoundException("Bạn hiện không có hợp đồng thuê phòng nào đang hoạt động."));
 
-        return contractMapper.contractToContractResponse(contract);
+    public List<ContractResponse> getContract(Long tenantId,ContractStatus contractStatus){
+        List<ContractAgreement> contract = contractRepository.findByTenantIdAndOptionalStatus(tenantId,contractStatus);
+        return contractMapper.contractListToContractResponseList(contract);
     }
 
-    public PageResponse<ContractAgreement> getContracts(
+    public PageResponse<ContractResponse> getContracts(
             String search,
             String status,
             BigDecimal deposit,
@@ -74,22 +70,20 @@ public class ContractService {
                 cb.conjunction();
 
         if (search != null && !search.isBlank()) {
-            String keyword = "%" + search.trim().toLowerCase() + "%";
-
-            Long contractId = Long.parseLong(search.trim());
-
-            spec = spec.and((root, query, cb) ->
-                    cb.equal(root.get("id"),contractId)
-            );
+            try {
+                Long contractId = Long.parseLong(search.trim());
+                spec = spec.and((root, query, cb) -> cb.equal(root.get("id"), contractId));
+            } catch (NumberFormatException e) {
+            }
         }
 
         if (status != null && !status.isBlank()) {
-            spec = spec.and((root, query, cb) ->
-                    cb.equal(
-                            cb.lower(root.get("status")),
-                            status.trim().toLowerCase()
-                    )
-            );
+            try {
+                ContractStatus enumStatus = ContractStatus.valueOf(status.trim().toUpperCase());
+                spec = spec.and((root, query, cb) -> cb.equal(root.get("status"), enumStatus));
+            } catch (IllegalArgumentException e) {
+                throw new BadRequestException("Trạng thái hợp đồng '" + status + "' không hợp lệ.");
+            }
         }
 
         if (deposit != null && deposit.compareTo(BigDecimal.ZERO) > 0) {
@@ -120,10 +114,11 @@ public class ContractService {
         Pageable pageable = PageRequest.of(page, size, sorting);
 
         // Database lọc, sắp xếp và phân trang
-        Page<ContractAgreement> roomPage = contractRepository.findAll(spec, pageable);
+        Page<ContractAgreement> contractPage = contractRepository.findAll(spec, pageable);
+        Page<ContractResponse> responsePage = contractPage.map(contractMapper::contractToContractResponse);
 
 
-        return PageResponseUtil.from(roomPage);
+        return PageResponseUtil.from(responsePage);
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -132,9 +127,11 @@ public class ContractService {
         if (!contractAgreement.getStatus().equals(ContractStatus.ACTIVE)){
             throw new BadRequestException("Hợp đồng này đã bị thanh lý hoặc không còn hiệu lực");
         }
+
         contractAgreement.setStatus(ContractStatus.TERMINATED);
         contractAgreement.setEndDate(LocalDate.now());
         contractRepository.save(contractAgreement);
+
         try {
             restClient.patch()
                     .uri("/api/v1/rooms/{roomId}/status", contractAgreement.getRoomId())
@@ -160,6 +157,7 @@ public class ContractService {
     @Transactional
     public ContractResponse createContract(ContractCreateRequest contractCreateRequest){
         Boolean isAvailable = false;
+
         try{
             isAvailable = restClient.get()
                     .uri("/api/v1/rooms/check-status/{id}", contractCreateRequest.getRoomId())
@@ -172,9 +170,11 @@ public class ContractService {
         } catch (RestClientException e) {
             throw new ExternalServiceException("Lỗi giao tiếp với dịch vụ quản lý phòng");
         }
+
         if(!Boolean.TRUE.equals(isAvailable)){
             throw new BadRequestException("Phòng này hiện không sẵn sàng hoặc đã có người thuê.");
         }
+
         ContractAgreement contractAgreement = contractMapper.contractToContractAgreement(contractCreateRequest);
         contractAgreement.setStatus(ContractStatus.ACTIVE);
         ContractAgreement savedContract = contractRepository.save(contractAgreement);
@@ -186,8 +186,12 @@ public class ContractService {
                     .body(Map.of("status", "OCCUPIED"))
                     .retrieve()
                     .toBodilessEntity();
-        } catch (Exception e){
-            throw new ExternalServiceException("Không thể cập nhật trạng thái phòng sang OCCUPIED: " + e.getMessage());
+        }catch (ResourceAccessException e) {
+            throw new ServiceUnavailableException("Dịch vụ quản lý phòng hiện không khả dụng. Vui lòng thử lại sau.");
+        } catch (RestClientResponseException e) {
+            throw new ExternalServiceException("Lỗi phản hồi từ property-service: " + e.getResponseBodyAsString());
+        } catch (RestClientException e) {
+            throw new ExternalServiceException("Không thể cập nhật trạng thái phòng sang OCCUPIED.");
         }
         return contractMapper.contractToContractResponse(savedContract);
     }
