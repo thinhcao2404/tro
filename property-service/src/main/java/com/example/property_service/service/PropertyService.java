@@ -16,6 +16,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.Map;
@@ -28,6 +29,7 @@ public class PropertyService {
     @Autowired
     private PropertyRepository propertyRepository;
 
+    @Transactional
     public void deleteRoom(Long id) {
         Room room = propertyRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy phòng."));
@@ -37,17 +39,23 @@ public class PropertyService {
         propertyRepository.deleteById(id);
     }
 
+    @Transactional(readOnly = true)
     public boolean checkStatus(Long id){
         Room room = propertyRepository.findById(id)
                 .orElseThrow(()-> new ResourceNotFoundException("Không tìm thấy phòng."));
         return room.getStatus() == RoomStatus.AVAILABLE;
     }
 
+    @Transactional
     public Room createRoom(RoomRequest request) throws ResourceNotFoundException {
+        if (propertyRepository.existsByRoomNumber(request.getRoomNumber())){
+            throw new BadRequestException("Số phòng '" + request.getRoomNumber() + "' đã tồn tại.");
+        }
         Room room = propertyMapper.toRoom(request);
         return propertyRepository.save(room);
     }
 
+    @Transactional
     public Room updateRoom(Long id,RoomRequest request) throws ResourceNotFoundException {
         Room room = findRoomById(id);
         propertyMapper.updateRoomFromRequest(request, room);
@@ -62,34 +70,33 @@ public class PropertyService {
 
     public Room findRoomById(Long id) throws ResourceNotFoundException {
         return propertyRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "Phòng có ID " + id + " không tồn tại"
-                ));
+                .orElseThrow(() -> new ResourceNotFoundException("Phòng có ID " + id + " không tồn tại"));
     }
-    public Room patchRoom(
-            Long id,
-            Map<String, Object> updates)
-            throws ResourceNotFoundException {
 
+    @Transactional
+    public Room patchRoom(Long id, Map<String, Object> updates) {
         Room room = findRoomById(id);
 
         if (updates.containsKey("status")) {
-            Object status = updates.get("status");
-
-            if (status != null && !(status instanceof String)) {
-                throw new BadRequestException(
-                        "Status không hợp lệ."
-                );
+            Object statusObj = updates.get("status");
+            if (statusObj != null) {
+                try {
+                    RoomStatus newStatus = RoomStatus.valueOf(statusObj.toString().trim().toUpperCase());
+                    room.setStatus(newStatus);
+                } catch (IllegalArgumentException e) {
+                    throw new BadRequestException("Trạng thái phòng không hợp lệ.");
+                }
             }
-
-            room.setStatus((RoomStatus) status);
         }
 
         if (updates.containsKey("price")) {
-            Object price = updates.get("price");
-
-            if (price != null) {
-                room.setPrice(new BigDecimal(price.toString()));
+            Object priceObj = updates.get("price");
+            if (priceObj != null) {
+                try {
+                    room.setPrice(new BigDecimal(priceObj.toString()));
+                } catch (NumberFormatException e) {
+                    throw new BadRequestException("Giá phòng không đúng định dạng số.");
+                }
             }
         }
 
@@ -126,12 +133,12 @@ public class PropertyService {
         }
 
         if (status != null && !status.isBlank()) {
-            spec = spec.and((root, query, cb) ->
-                    cb.equal(
-                            cb.lower(root.get("status")),
-                            status.trim().toLowerCase()
-                    )
-            );
+            try {
+                RoomStatus enumStatus = RoomStatus.valueOf(status.trim().toUpperCase());
+                spec = spec.and((root, query, cb) -> cb.equal(root.get("status"), enumStatus));
+            } catch (IllegalArgumentException e) {
+                throw new BadRequestException("Trạng thái lọc '" + status + "' không hợp lệ.");
+            }
         }
 
         if (floor != null && floor > 0) {

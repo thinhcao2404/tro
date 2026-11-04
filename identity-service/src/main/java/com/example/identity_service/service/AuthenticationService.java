@@ -8,8 +8,8 @@ import com.example.identity_service.entity.RefreshToken;
 import com.example.identity_service.entity.SysAccount;
 import com.example.identity_service.exception.BadRequestException;
 import com.example.identity_service.mapper.IdentifyMapper;
-import com.example.identity_service.repository.IdentifyRepository;
-import com.example.identity_service.repository.RefeshTokeRepository;
+import com.example.identity_service.repository.SysAccountRepository;
+import com.example.identity_service.repository.RefreshTokenRepository;
 import com.example.identity_service.security.JwtTokenProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -22,7 +22,7 @@ import java.time.LocalDateTime;
 @Service
 public class AuthenticationService {
     @Autowired
-    private IdentifyRepository identifyRepository;
+    private SysAccountRepository sysAccountRepository;
     @Autowired
     private PasswordEncoder passwordEncoder;
     @Autowired
@@ -30,12 +30,12 @@ public class AuthenticationService {
     @Autowired
     private JwtTokenProvider jwtTokenProvider;
     @Autowired
-    private RefeshTokeRepository  refeshTokenRepository;
+    private RefreshTokenRepository refreshTokenRepository;
 
     @Transactional
     public AuthResponse login(LoginRequest request){
 
-        SysAccount sysAccount = identifyRepository.findByUsername(request.getUsername())
+        SysAccount sysAccount = sysAccountRepository.findByUsername(request.getUsername())
                 .orElseThrow(()-> new BadRequestException("Tên đăng nhập hoặc mật khẩu không chính xác. Vui lòng thử lại"));
         boolean isPasswordMatched = passwordEncoder.matches(request.getPassword(),sysAccount.getPasswordHash());
         if(!isPasswordMatched){
@@ -60,8 +60,7 @@ public class AuthenticationService {
         }
 
         String usernameFromToken = jwtTokenProvider.getUsernameFromToken(request.getRefreshToken());
-
-        RefreshToken refreshToken = refeshTokenRepository.findByToken(request.getRefreshToken())
+        RefreshToken refreshToken = refreshTokenRepository.findByToken(request.getRefreshToken())
                 .orElseThrow(()-> new BadRequestException("Refresh Token không hợp lệ hoặc không tồn tại"));
 
         if (Boolean.TRUE.equals(refreshToken.getIsRevoked())) {
@@ -69,7 +68,7 @@ public class AuthenticationService {
         }
 
         if(refreshToken.getExpiryDate().isBefore(Instant.now())){
-            refeshTokenRepository.delete(refreshToken);
+            refreshTokenRepository.delete(refreshToken);
             throw new BadRequestException("Refresh Token đã hết hạn.");
         }
 
@@ -79,10 +78,15 @@ public class AuthenticationService {
             throw new BadRequestException("Thông tin định danh trong Refresh Token không hợp lệ.");
         }
 
+        if (!Boolean.TRUE.equals(sysAccount.getIsActive())) {
+            refreshTokenRepository.delete(refreshToken);
+            throw new BadRequestException("Tài khoản này hiện đang bị khóa hoặc ngưng hoạt động.");
+        }
+
         String newAccessToken = jwtTokenProvider.generateAccessToken(sysAccount);
         String newRefreshToken = jwtTokenProvider.generateRefreshToken(sysAccount);
 
-        refeshTokenRepository.delete(refreshToken);
+        refreshTokenRepository.delete(refreshToken);
         saveRefreshToken(sysAccount,newRefreshToken);
 
         return TokenRefreshResponse.builder()
@@ -92,7 +96,7 @@ public class AuthenticationService {
     }
 
     private void saveRefreshToken(SysAccount sysAccount,String refreshToken){
-        refeshTokenRepository.deleteByAccount(sysAccount);
+        refreshTokenRepository.deleteByAccount(sysAccount);
 
         RefreshToken newRefreshToken = RefreshToken.builder()
                 .account(sysAccount)
@@ -101,15 +105,15 @@ public class AuthenticationService {
                 .createdAt(LocalDateTime.now())
                 .expiryDate(Instant.now().plusMillis(jwtTokenProvider.getRefreshTokenExpirationMs()))
                 .build();
-        refeshTokenRepository.save(newRefreshToken);
+        refreshTokenRepository.save(newRefreshToken);
     }
 
     @Transactional
     public void logout(String refreshTokenStr){
-        RefreshToken refreshToken = refeshTokenRepository.findByToken(refreshTokenStr)
+        RefreshToken refreshToken = refreshTokenRepository.findByToken(refreshTokenStr)
                 .orElseThrow(() -> new BadRequestException("Refresh Token không hợp lệ."));
 
         refreshToken.setIsRevoked(true);
-        refeshTokenRepository.save(refreshToken);
+        refreshTokenRepository.save(refreshToken);
     }
 }

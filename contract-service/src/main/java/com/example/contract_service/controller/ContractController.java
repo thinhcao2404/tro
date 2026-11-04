@@ -5,6 +5,7 @@ import com.example.contract_service.dto.request.ContractCreateRequest;
 import com.example.contract_service.dto.response.ContractResponse;
 import com.example.contract_service.dto.response.PageResponse;
 import com.example.contract_service.entity.ContractAgreement;
+import com.example.contract_service.enums.ContractStatus;
 import com.example.contract_service.exception.BadRequestException;
 import com.example.contract_service.service.ContractService;
 import jakarta.validation.Valid;
@@ -16,7 +17,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
-
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/contracts")
@@ -45,34 +46,37 @@ public class ContractController {
     }
 
     @GetMapping
-    public ResponseEntity<PageResponse<ContractAgreement>> getContracts(
+    public ResponseEntity<PageResponse<ContractResponse>> getContracts(
             @RequestParam(required = false)  String search,
             @RequestParam(required = false)  String status,
             @RequestParam(required = false)  BigDecimal deposit,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "4") int size,
             @RequestParam(defaultValue = "id,asc") String sort) {
-        PageResponse<ContractAgreement> response = contractService.getContracts(search, status, deposit, page, size, sort);
+        PageResponse<ContractResponse> response = contractService.getContracts(search, status, deposit, page, size, sort);
         return ResponseEntity.ok(response);
     }
 
-    @GetMapping("/my-contract")
+    @GetMapping("/my-contracts")
     @PreAuthorize("hasRole('TENANT')")
-    public ResponseEntity<ContractResponse> getMyContract(@AuthenticationPrincipal Jwt jwt) {
+    public ResponseEntity<List<ContractResponse>> getMyContracts(
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestParam(required = false)ContractStatus status) {
         Long tenantId = jwt.getClaim("tenantId");
         if (tenantId == null) {
             throw new BadRequestException("Token không chứa thông tin tenantId.");
         }
-        ContractResponse response = contractService.getContractByTenantId(tenantId);
+        List<ContractResponse> response = contractService.getContract(tenantId,status);
         return ResponseEntity.ok(response);
     }
 
     @GetMapping("/tenant/{requestedTenantId}")
     @PreAuthorize("hasRole('LANDLORD')")
-    public ResponseEntity<ContractResponse> getContractByTenantId(
-            @PathVariable Long requestedTenantId) {
+    public ResponseEntity<List<ContractResponse>> getContractByTenantId(
+            @PathVariable Long requestedTenantId,
+            @RequestParam ContractStatus status) {
 
-        ContractResponse response = contractService.getContractByTenantId(requestedTenantId);
+        List<ContractResponse> response = contractService.getContract(requestedTenantId,status);
         return ResponseEntity.ok(response);
     }
 

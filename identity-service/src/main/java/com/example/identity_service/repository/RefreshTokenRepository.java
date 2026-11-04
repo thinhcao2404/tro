@@ -6,7 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Optional;
 
-public interface RefeshTokeRepository extends JpaRepository<RefreshToken,Long> {
+public interface RefreshTokenRepository extends JpaRepository<RefreshToken,Long> {
     Optional<RefreshToken> findByToken(String token);
     public void deleteByAccount(SysAccount sysAccount);
 }

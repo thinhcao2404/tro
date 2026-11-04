@@ -41,7 +41,7 @@ public class TenantService {
     @Autowired
     private RestClient identityRestClient;
 
-    public PageResponse<TenantProfile> getTenants(
+    public PageResponse<TenantResponse> getTenants(
             String search,
             String phone,
             String identityNumber,
@@ -57,9 +57,7 @@ public class TenantService {
         }
 
         // Xây dựng điều kiện lọc
-        Specification<TenantProfile> spec = (root, query, cb) ->
-                cb.conjunction();
-
+        Specification<TenantProfile> spec = (root, query, cb) -> cb.conjunction();
         if (search != null && !search.isBlank()) {
             String keyword = "%" + search.trim().toLowerCase() + "%";
 
@@ -98,10 +96,11 @@ public class TenantService {
 
         // Chỉ cho phép các trường được hỗ trợ
         sortField = switch (sortField) {
-            case "search", "phone", "identityNumber", "id" -> sortField;
+            case "fullName", "search" -> "fullName";
+            case "phone" -> "phone";
+            case "identityNumber" -> "identityNumber";
             default -> "id";
         };
-
         Sort.Direction direction =
                 sortParams.length > 1
                         && "desc".equalsIgnoreCase(sortParams[1].trim())
@@ -114,9 +113,9 @@ public class TenantService {
         Pageable pageable = PageRequest.of(page, size, sorting);
 
         // Database lọc, sắp xếp và phân trang
-        Page<TenantProfile> roomPage = tenantRepository.findAll(spec, pageable);
-
-        return PageResponseUtil.from(roomPage);
+        Page<TenantProfile> tenantPage = tenantRepository.findAll(spec, pageable);
+        Page<TenantResponse> responsePage = tenantPage.map(tenantMapper::toTenantResponse);
+        return PageResponseUtil.from(responsePage);
     }
 
     @Transactional
@@ -141,6 +140,7 @@ public class TenantService {
                     .oldUsername(oldUserName)
                     .build();
 
+        try{
             identityRestClient.put()
                     .uri("/api/v1/accounts/tenants")
                     .body(updateTenantAccountRequest)
@@ -152,17 +152,22 @@ public class TenantService {
                         throw new RuntimeException("Hệ thống Identity Service gặp sự cố.");
                     })
                     .toBodilessEntity();
+        } catch (ResourceAccessException e){
+            throw new ServiceUnavailableException("Không thể kết nối đến Identity Service. Vui lòng thử lại sau.");
+        } catch (RestClientResponseException e) {
+            throw new ExternalServiceException("Lỗi phản hồi từ Identity Service: " + e.getResponseBodyAsString());
+        }
         return tenantMapper.toTenantResponse(savedTenant);
     }
 
 
-    public TenantProfile findTenantById(Long id) throws ResourceNotFoundException {
+    public TenantProfile findTenantById(Long id) {
         return tenantRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy khách thuê."));
     }
 
     @Transactional
-    public void deleteTenant(Long id) throws ResourceNotFoundException {
+    public void deleteTenant(Long id){
         TenantProfile tenant = findTenantById(id);
         try{
             Boolean hasActiveContract = contractRestClient.get()
@@ -203,18 +208,24 @@ public class TenantService {
                 .username(savedTenant.getPhone())
                 .fullName(savedTenant.getFullName())
                 .build();
+        try{
+            identityRestClient.post()
+                    .uri("/api/v1/accounts/tenants")
+                    .body(accountRequest)
+                    .retrieve()
+                    .onStatus(HttpStatusCode::is4xxClientError, (req, res) -> {
+                        throw new BadRequestException("Tạo tài khoản thất bại: Thông tin gửi sang Identity Service không hợp lệ.");
+                    })
+                    .onStatus(HttpStatusCode::is5xxServerError, (req, res) -> {
+                        throw new RuntimeException("Hệ thống Identity Service gặp sự cố.");
+                    })
+                    .toBodilessEntity();
+        }catch (ResourceAccessException e) {
+            throw new ServiceUnavailableException("Không thể kết nối đến Identity Service. Vui lòng thử lại sau.");
+        } catch (RestClientResponseException e) {
+            throw new ExternalServiceException("Lỗi phản hồi từ Identity Service: " + e.getResponseBodyAsString());
+        }
 
-        identityRestClient.post()
-                .uri("/api/v1/accounts/tenants")
-                .body(accountRequest)
-                .retrieve()
-                .onStatus(HttpStatusCode::is4xxClientError, (req, res) -> {
-                    throw new BadRequestException("Tạo tài khoản thất bại: Thông tin gửi sang Identity Service không hợp lệ.");
-                })
-                .onStatus(HttpStatusCode::is5xxServerError, (req, res) -> {
-                    throw new RuntimeException("Hệ thống Identity Service gặp sự cố.");
-                })
-                .toBodilessEntity();
 
         return tenantMapper.toTenantResponse(savedTenant);
     }

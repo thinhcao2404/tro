@@ -22,19 +22,20 @@ public class TenantController {
 
     @GetMapping
     @PreAuthorize("hasRole('LANDLORD')")
-    public ResponseEntity<PageResponse<TenantProfile>> getAllTenants(@RequestParam(required = false) String search,
+    public ResponseEntity<PageResponse<TenantResponse>> getAllTenants(@RequestParam(required = false) String search,
                                                                     @RequestParam(required = false) String phone,
                                                                     @RequestParam(required = false) String identityNumber,
                                                                     @RequestParam(required = false) Boolean isDeleted,
                                                                     @RequestParam(defaultValue = "0") int page,
                                                                     @RequestParam(defaultValue = "4") int size,
                                                                     @RequestParam(defaultValue = "id,asc") String sort) {
-        PageResponse<TenantProfile> tenants= tenantService.getTenants(search,phone,identityNumber,isDeleted,page,size,sort);
+        PageResponse<TenantResponse> tenants= tenantService.getTenants(search,phone,identityNumber,isDeleted,page,size,sort);
         return ResponseEntity.ok(tenants);
     }
 
     @PutMapping("/{tenantId}")
-    public ResponseEntity<TenantResponse> updateTenant(@PathVariable Long tenantId, @Valid @RequestBody TenantRequest request) {
+    public ResponseEntity<TenantResponse> updateTenant(@PathVariable Long tenantId,
+                                                       @Valid @RequestBody TenantRequest request) {
         TenantResponse response = tenantService.updateTenant(tenantId,request);
         return ResponseEntity.ok(response);
     }
@@ -47,6 +48,7 @@ public class TenantController {
     }
 
     @PostMapping
+    @PreAuthorize("hasRole('LANDLORD')")
     public ResponseEntity<TenantResponse> createTenant(@Valid @RequestBody TenantRequest request) {
         TenantResponse response = tenantService.createTenant(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);

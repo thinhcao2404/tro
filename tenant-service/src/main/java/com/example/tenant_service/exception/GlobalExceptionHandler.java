@@ -2,6 +2,7 @@ package com.example.tenant_service.exception;
 
 import com.example.tenant_service.dto.response.ErrorResponse;
 import jakarta.servlet.http.HttpServletRequest;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -64,8 +65,9 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(BadRequestException.class)
-    public ResponseEntity<ErrorResponse> handleIBadRequestException(
-            BadRequestException ex, HttpServletRequest request){
+    public ResponseEntity<ErrorResponse> handleBadRequestException(
+            BadRequestException ex, HttpServletRequest request) {
+
         ErrorResponse response = new ErrorResponse(
                 HttpStatus.BAD_REQUEST.value(),
                 "Bad Request",
@@ -77,11 +79,16 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler({ResourceAccessException.class, ServiceUnavailableException.class})
     public ResponseEntity<ErrorResponse> handleResourceAccessException(
-            ResourceAccessException ex, HttpServletRequest request) {
+            Exception ex, HttpServletRequest request) {
+
+        String errorMessage = (ex instanceof ServiceUnavailableException && ex.getMessage() != null)
+                ? ex.getMessage()
+                : "Một trong các dịch vụ liên kết hiện không khả dụng. Vui lòng thử lại sau.";
+
         ErrorResponse response = new ErrorResponse(
                 HttpStatus.SERVICE_UNAVAILABLE.value(),
                 "Service Unavailable",
-                ex.getMessage() != null ? ex.getMessage() : "Một trong các dịch vụ liên kết hiện không khả dụng. Vui lòng thử lại sau.",
+                errorMessage,
                 request.getRequestURI()
         );
         return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(response);
@@ -103,10 +110,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleGlobalException(
             Exception ex, HttpServletRequest request) {
+
         ErrorResponse response = new ErrorResponse(
                 HttpStatus.INTERNAL_SERVER_ERROR.value(),
                 "Internal Server Error",
-                "Đã xảy ra lỗi hệ thống: " + ex.getMessage(),
+                "Đã xảy ra lỗi hệ thống nội bộ. Vui lòng thử lại sau.",
                 request.getRequestURI()
         );
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
