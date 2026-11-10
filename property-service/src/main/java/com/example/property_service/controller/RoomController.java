@@ -33,7 +33,8 @@ public class RoomController {
         return ResponseEntity.ok(response);
     }
 
-    @GetMapping("check-status/{id}")
+    @GetMapping("internal/check-status/{id}")
+    @PreAuthorize("hasRole('LANDLORD')")
     public ResponseEntity<Boolean> checkStatus(@PathVariable Long id){
         return  ResponseEntity.ok(propertyService.checkStatus(id));
     }
@@ -69,7 +70,7 @@ public class RoomController {
         return ResponseEntity.ok(room);
     }
 
-    @PatchMapping("/{id}/status")
+    @PatchMapping("internal/{id}/status")
     @PreAuthorize("hasRole('LANDLORD')")
     public ResponseEntity<?> updateRoomStatus(
             @PathVariable Long id,
