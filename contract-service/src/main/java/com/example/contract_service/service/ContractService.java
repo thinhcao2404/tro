@@ -134,7 +134,7 @@ public class ContractService {
 
         try {
             restClient.patch()
-                    .uri("/api/v1/rooms/{roomId}/status", contractAgreement.getRoomId())
+                    .uri("/api/v1/rooms/internal/{roomId}/status", contractAgreement.getRoomId())
                     .contentType(MediaType.APPLICATION_JSON)
                     .body(Map.of("status", "AVAILABLE"))
                     .retrieve()
@@ -160,7 +160,7 @@ public class ContractService {
 
         try{
             isAvailable = restClient.get()
-                    .uri("/api/v1/rooms/check-status/{id}", contractCreateRequest.getRoomId())
+                    .uri("/api/v1/rooms/internal/check-status/{id}", contractCreateRequest.getRoomId())
                     .retrieve()
                     .body(Boolean.class);
         } catch (ResourceAccessException e) {
@@ -181,7 +181,7 @@ public class ContractService {
 
         try {
             restClient.patch()
-                    .uri("/api/v1/rooms/{roomId}/status", contractAgreement.getRoomId())
+                    .uri("/api/v1/rooms/internal/{roomId}/status", contractAgreement.getRoomId())
                     .contentType(MediaType.APPLICATION_JSON)
                     .body(Map.of("status", "OCCUPIED"))
                     .retrieve()

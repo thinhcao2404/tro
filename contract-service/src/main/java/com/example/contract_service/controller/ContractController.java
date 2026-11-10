@@ -39,7 +39,8 @@ public class ContractController {
         return ResponseEntity.ok(response);
     }
 
-    @GetMapping("/check-active")
+    @GetMapping("internal/check-active")
+    @PreAuthorize("hasRole('LANDLORD')")
     public ResponseEntity<Boolean> getActiveContract(@RequestParam("tenantId") Long tenantId){
        boolean hasActive = contractService.hasActiveContract(tenantId);
        return ResponseEntity.ok(hasActive);

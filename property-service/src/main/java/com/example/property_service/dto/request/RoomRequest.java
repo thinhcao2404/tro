@@ -31,8 +31,7 @@ public class RoomRequest {
     @DecimalMin(value = "0.0", inclusive = false, message = "Giá phòng phải lớn hơn 0")
     Double price;
 
-    @NotBlank(message = "Trạng thái không được để trống")
-    @Pattern(regexp = "^(AVAILABLE|OCCUPIED|MAINTENANCE)$", message = "Trạng thái chỉ có thể là AVAILABLE, OCCUPIED hoặc MAINTENANCE")
+    @NotNull(message = "Trạng thái không được để trống")
     @Enumerated(EnumType.STRING)
     private RoomStatus status;
 

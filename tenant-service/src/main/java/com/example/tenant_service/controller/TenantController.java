@@ -3,15 +3,12 @@ package com.example.tenant_service.controller;
 import com.example.tenant_service.dto.request.TenantRequest;
 import com.example.tenant_service.dto.response.PageResponse;
 import com.example.tenant_service.dto.response.TenantResponse;
-import com.example.tenant_service.entity.TenantProfile;
 import com.example.tenant_service.service.TenantService;
-import org.springframework.security.oauth2.jwt.Jwt;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -34,6 +31,7 @@ public class TenantController {
     }
 
     @PutMapping("/{tenantId}")
+    @PreAuthorize("hasRole('LANDLORD')")
     public ResponseEntity<TenantResponse> updateTenant(@PathVariable Long tenantId,
                                                        @Valid @RequestBody TenantRequest request) {
         TenantResponse response = tenantService.updateTenant(tenantId,request);
