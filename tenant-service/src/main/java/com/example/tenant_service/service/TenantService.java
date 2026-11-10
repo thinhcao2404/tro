@@ -124,9 +124,11 @@ public class TenantService {
         if (tenantRepository.existsByPhoneAndIdNot(request.getPhone(), id)){
             throw new BadRequestException("Số điện thoại này đã được sử dụng bởi khách thuê khác.");
         }
+
         if (tenantRepository.existsByIdentityNumberAndIdNot(request.getIdentityNumber(),id)){
             throw new BadRequestException("Số CCCD này đã được sử dụng bởi khách thuê khác.");
         }
+
         String oldUserName = tenantProfile.getPhone();
         tenantProfile.setFullName(request.getFullName());
         tenantProfile.setPhone(request.getPhone());
@@ -171,7 +173,7 @@ public class TenantService {
         TenantProfile tenant = findTenantById(id);
         try{
             Boolean hasActiveContract = contractRestClient.get()
-                    .uri("/api/v1/contracts/check-active?tenantId={tenantId}",id)
+                    .uri("/api/v1/contracts/internal/check-active?tenantId={tenantId}",id)
                     .retrieve()
                     .body(Boolean.class);
             if (Boolean.TRUE.equals(hasActiveContract)) {
