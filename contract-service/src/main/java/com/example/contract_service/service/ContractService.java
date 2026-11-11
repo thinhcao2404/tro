@@ -12,6 +12,7 @@ import com.example.contract_service.exception.ServiceUnavailableException;
 import com.example.contract_service.mapper.ContractMapper;
 import com.example.contract_service.repository.ContractRepository;
 import com.example.contract_service.util.PageResponseUtil;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -39,13 +40,18 @@ public class ContractService {
     private RestClient restClient;
     @Autowired
     private ContractMapper contractMapper;
+    @Autowired
+    private RabbitTemplate rabbitTemplate;
 
-    public ContractAgreement  findContractAgreementById(Long id) throws ResourceNotFoundException {
+    public ContractAgreement  findContractAgreementById(Long id){
         return contractRepository.findById(id).
                 orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy hợp đồng với ID: " + id));
     }
-
-
+    public ContractResponse findContractById(Long id){
+        ContractAgreement contract = contractRepository.findById(id).
+                orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy hợp đồng với ID: " + id));
+        return contractMapper.contractToContractResponse(contract);
+    }
     public List<ContractResponse> getContract(Long tenantId,ContractStatus contractStatus){
         List<ContractAgreement> contract = contractRepository.findByTenantIdAndOptionalStatus(tenantId,contractStatus);
         return contractMapper.contractListToContractResponseList(contract);
@@ -80,7 +86,7 @@ public class ContractService {
         if (status != null && !status.isBlank()) {
             try {
                 ContractStatus enumStatus = ContractStatus.valueOf(status.trim().toUpperCase());
-                spec = spec.and((root, query, cb) -> cb.equal(root.get("status"), enumStatus));
+                spec = spec.and((root, query, cb) -> cb.equal(root.get("status"), enumStatus.name()));
             } catch (IllegalArgumentException e) {
                 throw new BadRequestException("Trạng thái hợp đồng '" + status + "' không hợp lệ.");
             }
@@ -193,6 +199,7 @@ public class ContractService {
         } catch (RestClientException e) {
             throw new ExternalServiceException("Không thể cập nhật trạng thái phòng sang OCCUPIED.");
         }
+        rabbitTemplate.convertAndSend(savedContract);
         return contractMapper.contractToContractResponse(savedContract);
     }
 }

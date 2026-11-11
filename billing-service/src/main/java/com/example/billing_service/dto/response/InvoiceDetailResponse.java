@@ -15,7 +15,6 @@ public class InvoiceDetailResponse {
     Long id;
     Long contractId;
     String roomNumber;
-    String tenantName;
     Integer month;
     Integer year;
 
@@ -28,8 +27,6 @@ public class InvoiceDetailResponse {
     BigDecimal totalAmount;
 
     String status;
-    String paymentCode;
-    String vietQrUrl;
     LocalDateTime paymentDate;
     LocalDateTime createdAt;
 }
