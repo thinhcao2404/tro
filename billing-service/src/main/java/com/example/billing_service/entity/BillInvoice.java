@@ -9,7 +9,9 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "bill_invoices")
+@Table(name = "bill_invoices", uniqueConstraints = {
+        @UniqueConstraint(name = "uk_bill_contract_month_year", columnNames = {"contract_id", "month", "year"})
+})
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -23,6 +25,9 @@ public class BillInvoice {
 
     @Column(name = "contract_id", nullable = false)
     Long contractId;
+
+    @Column(name = "room_number", length = 20)
+    String roomNumber;
 
     @Column(name = "month", nullable = false)
     Integer month;

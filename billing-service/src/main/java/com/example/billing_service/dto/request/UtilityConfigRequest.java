@@ -29,5 +29,6 @@ public class UtilityConfigRequest {
     String unitType;
 
     @Builder.Default
+    @NotNull(message = "Trạng thái hoạt động không được để trống")
     Boolean isActive = true;
 }
