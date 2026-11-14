@@ -10,21 +10,29 @@ spring:
         webflux:
           routes:
             - id: identity-service
-              uri: http://localhost:8080
+              uri: lb://IDENTITY-SERVICE
               predicates:
                 - Path=/api/v1/auth/**
             - id: property-service
-              uri: http://localhost:8081
+              uri: lb://PROPERTY-SERVICE
               predicates:
                 - Path=/api/v1/rooms/**
             - id: contracts-service
-              uri: http://localhost:8083
+              uri: lb://CONTRACT-SERVICE
               predicates:
                 - Path=/api/v1/contracts/**
             - id: tenant-service
-              uri: http://localhost:8082
+              uri: lb://TENANT-SERVICE
               predicates:
                   - Path=/api/v1/tenants/**
+            - id: billing-service
+              uri: lb://BILLING-SERVICE
+              predicates:
+                - Path=/api/v1/invoices/**,/api/v1/utilities/**
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
 
 jwt:
   secret: 404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970
