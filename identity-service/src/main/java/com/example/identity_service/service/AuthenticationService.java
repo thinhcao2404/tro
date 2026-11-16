@@ -11,7 +11,7 @@ import com.example.identity_service.mapper.IdentifyMapper;
 import com.example.identity_service.repository.SysAccountRepository;
 import com.example.identity_service.repository.RefreshTokenRepository;
 import com.example.identity_service.security.JwtTokenProvider;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,17 +20,13 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 
 @Service
+@RequiredArgsConstructor
 public class AuthenticationService {
-    @Autowired
-    private SysAccountRepository sysAccountRepository;
-    @Autowired
-    private PasswordEncoder passwordEncoder;
-    @Autowired
-    private IdentifyMapper  identifyMapper;
-    @Autowired
-    private JwtTokenProvider jwtTokenProvider;
-    @Autowired
-    private RefreshTokenRepository refreshTokenRepository;
+    private final SysAccountRepository sysAccountRepository;
+    private final PasswordEncoder passwordEncoder;
+    private final IdentifyMapper identifyMapper;
+    private final JwtTokenProvider jwtTokenProvider;
+    private final RefreshTokenRepository refreshTokenRepository;
 
     @Transactional
     public AuthResponse login(LoginRequest request){

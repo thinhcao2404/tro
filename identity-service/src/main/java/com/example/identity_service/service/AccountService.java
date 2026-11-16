@@ -9,7 +9,7 @@ import com.example.identity_service.exception.ResourceNotFoundException;
 import com.example.identity_service.mapper.IdentifyMapper;
 import com.example.identity_service.repository.SysAccountRepository;
 import com.example.identity_service.repository.RefreshTokenRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,18 +17,12 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.UUID;
 
 @Service
+@RequiredArgsConstructor
 public class AccountService {
-    @Autowired
-    private SysAccountRepository sysAccountRepository;
-
-    @Autowired
-    private RefreshTokenRepository refreshTokenRepository;
-
-    @Autowired
-    private IdentifyMapper identifyMapper;
-
-    @Autowired
-    private PasswordEncoder passwordEncoder;
+    private final SysAccountRepository sysAccountRepository;
+    private final RefreshTokenRepository refreshTokenRepository;
+    private final IdentifyMapper identifyMapper;
+    private final PasswordEncoder passwordEncoder;
 
     @Transactional
     public String createTenantAccount(CreateTenantAccountRequest request) {

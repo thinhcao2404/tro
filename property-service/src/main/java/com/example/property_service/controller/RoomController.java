@@ -5,7 +5,7 @@ import com.example.property_service.entity.Room;
 import com.example.property_service.dto.request.RoomRequest;
 import com.example.property_service.service.PropertyService;
 import jakarta.validation.Valid;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -16,10 +16,10 @@ import java.util.*;
 
 @RestController
 @RequestMapping("/api/v1/rooms")
+@RequiredArgsConstructor
 public class RoomController {
 
-    @Autowired
-    private PropertyService propertyService;
+    private final PropertyService propertyService;
 
     @GetMapping
     public ResponseEntity<PageResponse<Room>> getRooms(

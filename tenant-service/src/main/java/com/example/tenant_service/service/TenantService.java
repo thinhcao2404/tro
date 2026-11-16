@@ -13,7 +13,7 @@ import com.example.tenant_service.exception.ServiceUnavailableException;
 import com.example.tenant_service.mapper.TenantMapper;
 import com.example.tenant_service.repository.TenantRepository;
 import com.example.tenant_service.util.PageResponseUtil;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -28,18 +28,12 @@ import org.springframework.web.client.RestClientResponseException;
 
 
 @Service
+@RequiredArgsConstructor
 public class TenantService {
-    @Autowired
-    private TenantRepository tenantRepository;
-
-    @Autowired
-    private TenantMapper tenantMapper;
-
-    @Autowired
-    private RestClient contractRestClient;
-
-    @Autowired
-    private RestClient identityRestClient;
+    private final TenantRepository tenantRepository;
+    private final TenantMapper tenantMapper;
+    private final RestClient contractRestClient;
+    private final RestClient identityRestClient;
 
     public PageResponse<TenantResponse> getTenants(
             String search,

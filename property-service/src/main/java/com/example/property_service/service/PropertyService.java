@@ -9,7 +9,7 @@ import com.example.property_service.exception.ResourceNotFoundException;
 import com.example.property_service.mapper.PropertyMapper;
 import com.example.property_service.repository.PropertyRepository;
 import com.example.property_service.util.PageResponseUtil;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -22,12 +22,10 @@ import java.math.BigDecimal;
 import java.util.Map;
 
 @Service
+@RequiredArgsConstructor
 public class PropertyService {
-    @Autowired
-    private PropertyMapper propertyMapper;
-
-    @Autowired
-    private PropertyRepository propertyRepository;
+    private final PropertyMapper propertyMapper;
+    private final PropertyRepository propertyRepository;
 
     @Transactional
     public void deleteRoom(Long id) {
