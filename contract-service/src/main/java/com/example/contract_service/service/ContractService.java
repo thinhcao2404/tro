@@ -12,8 +12,8 @@ import com.example.contract_service.exception.ServiceUnavailableException;
 import com.example.contract_service.mapper.ContractMapper;
 import com.example.contract_service.repository.ContractRepository;
 import com.example.contract_service.util.PageResponseUtil;
+import lombok.RequiredArgsConstructor;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -33,15 +33,12 @@ import java.util.List;
 import java.util.Map;
 
 @Service
+@RequiredArgsConstructor
 public class ContractService {
-    @Autowired
-    private ContractRepository contractRepository;
-    @Autowired
-    private RestClient restClient;
-    @Autowired
-    private ContractMapper contractMapper;
-    @Autowired
-    private RabbitTemplate rabbitTemplate;
+    private final ContractRepository contractRepository;
+    private final RestClient restClient;
+    private final ContractMapper contractMapper;
+    private final RabbitTemplate rabbitTemplate;
 
     public ContractAgreement  findContractAgreementById(Long id){
         return contractRepository.findById(id).

@@ -9,8 +9,8 @@ import com.example.contract_service.enums.ContractStatus;
 import com.example.contract_service.exception.BadRequestException;
 import com.example.contract_service.service.ContractService;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -21,9 +21,9 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/contracts")
+@RequiredArgsConstructor
 public class ContractController {
-    @Autowired
-    private ContractService contractService;
+    private final ContractService contractService;
 
     @PatchMapping("/{id}/checkout")
     @PreAuthorize("hasRole('LANDLORD')")
