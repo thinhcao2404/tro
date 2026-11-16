@@ -1,8 +1,10 @@
 package com.example.tenant_service.config;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cloud.client.loadbalancer.LoadBalanced;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -13,13 +15,26 @@ import java.time.Duration;
 
 @Configuration
 public class AppConfig {
+    @Bean
+    @LoadBalanced
+    public RestClient.Builder loadBalancedRestClientBuilder() {
+        return RestClient.builder();
+    }
 
     @Bean
-    public RestClient contractRestClient(@Value("${contract.service.url}") String baseUrl) {
+    @Primary
+    public RestClient.Builder restClientBuilder() {
+        return RestClient.builder();
+    }
+
+    @Bean
+    public RestClient contractRestClient(
+            @LoadBalanced RestClient.Builder builder,
+            @Value("${contract.service.url}") String baseUrl) {
         JdkClientHttpRequestFactory factory = new JdkClientHttpRequestFactory();
         factory.setReadTimeout(Duration.ofSeconds(3));
 
-        return RestClient.builder()
+        return builder.clone()
                 .baseUrl(baseUrl)
                 .requestFactory(factory)
                 .requestInterceptor((request, body, execution) -> {
@@ -33,11 +48,13 @@ public class AppConfig {
     }
 
     @Bean
-    public RestClient identityRestClient(@Value("${identity.service.url}") String baseUrl) {
+    public RestClient identityRestClient(
+            @LoadBalanced RestClient.Builder builder,
+            @Value("${identity.service.url}") String baseUrl) {
         JdkClientHttpRequestFactory factory = new JdkClientHttpRequestFactory();
         factory.setReadTimeout(Duration.ofSeconds(3));
 
-        return RestClient.builder()
+        return builder.clone()
                 .baseUrl(baseUrl)
                 .requestFactory(factory)
                 .requestInterceptor((request, body, execution) -> {

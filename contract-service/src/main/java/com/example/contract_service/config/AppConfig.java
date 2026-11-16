@@ -1,9 +1,10 @@
 package com.example.contract_service.config;
 
-import org.springframework.amqp.core.Queue;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cloud.client.loadbalancer.LoadBalanced;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -15,20 +16,28 @@ import java.time.Duration;
 @Configuration
 public class AppConfig {
 
-/*    public static final String CONTRACT_QUEUE = "contract.created.queue";
+    @Bean
+    @LoadBalanced
+    public RestClient.Builder loadBalancedRestClientBuilder() {
+        return RestClient.builder();
+    }
 
     @Bean
-    public Queue contractQueue() {
-        return new Queue(CONTRACT_QUEUE, false);
-    }*/
+    @Primary
+    public RestClient.Builder restClientBuilder() {
+        return RestClient.builder();
+    }
 
     @Bean
-    public RestClient restClient(@Value("${property.service.url}") String baseUrl) {
+    public RestClient restClient(
+            @LoadBalanced RestClient.Builder builder,
+            @Value("${property.service.url}") String baseUrl) {
         JdkClientHttpRequestFactory factory = new JdkClientHttpRequestFactory();
         factory.setReadTimeout(Duration.ofSeconds(3));
 
-        return RestClient.builder()
+        return builder.clone()
                 .baseUrl(baseUrl)
+                .requestFactory(factory)
                 .requestInterceptor((request, body, execution) -> {
                     Authentication auth = SecurityContextHolder.getContext().getAuthentication();
                     if (auth != null && auth.getPrincipal() instanceof Jwt jwt) {
