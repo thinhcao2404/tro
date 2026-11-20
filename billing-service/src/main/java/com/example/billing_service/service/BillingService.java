@@ -1,6 +1,7 @@
 package com.example.billing_service.service;
 
 import com.example.billing_service.dto.ContractCreatedEvent;
+import com.example.billing_service.dto.PaymentCompletedEvent;
 import com.example.billing_service.dto.request.InvoiceCreateRequest;
 import com.example.billing_service.dto.response.*;
 import com.example.billing_service.entity.BillInvoice;
@@ -15,12 +16,15 @@ import com.example.billing_service.repository.BillInvoiceRepository;
 import com.example.billing_service.repository.UtilityConfigRepository;
 import com.example.billing_service.util.PageResponseUtil;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.ResourceAccessException;
@@ -36,6 +40,7 @@ import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class BillingService {
     private final BillInvoiceRepository billInvoiceRepository;
     private final UtilityConfigRepository utilityConfigRepository;
@@ -48,12 +53,30 @@ public class BillingService {
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy hóa đơn."));
         return billingMapper.invoicetoInvoiceDetailResponse(bill);
     }
+
+    public InvoiceDetailResponse getInvoiceForUser(Long billingId, Jwt jwt) {
+        BillInvoice bill = billInvoiceRepository.findById(billingId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy hóa đơn."));
+
+        String role = jwt != null ? jwt.getClaimAsString("role") : null;
+        if ("LANDLORD".equals(role) || "ROLE_LANDLORD".equals(role)) {
+            return billingMapper.invoicetoInvoiceDetailResponse(bill);
+        }
+        if ("TENANT".equals(role) || "ROLE_TENANT".equals(role)) {
+            List<Long> contractIds = fetchCurrentTenantContractIds();
+            if (!contractIds.contains(bill.getContractId())) {
+                throw new AccessDeniedException("Bạn không có quyền truy cập hóa đơn này.");
+            }
+            return billingMapper.invoicetoInvoiceDetailResponse(bill);
+        }
+        throw new AccessDeniedException("Không có quyền truy cập hóa đơn.");
+    }
     @Transactional
     public void createDepositInvoice(ContractCreatedEvent event) {
         if (event == null || event.getContractId() == null) {
             throw new IllegalArgumentException("ContractCreatedEvent thiếu contractId");
         }
-        if (event.getDeposit() != null && event.getDeposit() < 0) {
+        if (event.getDeposit() != null && event.getDeposit().compareTo(BigDecimal.ZERO) < 0) {
             throw new IllegalArgumentException("Tiền cọc không được âm");
         }
 
@@ -63,11 +86,13 @@ public class BillingService {
         }
 
         BigDecimal deposit = event.getDeposit() != null
-                ? BigDecimal.valueOf(event.getDeposit())
+                ? event.getDeposit()
                 : BigDecimal.ZERO;
+        String roomNumber = fetchRoomNumberQuietly(event.getRoomId());
 
         BillInvoice depositInvoice = BillInvoice.builder()
                 .contractId(event.getContractId())
+                .roomNumber(roomNumber)
                 .month(0)
                 .year(LocalDate.now().getYear())
                 .oldElec(BigDecimal.ZERO)
@@ -339,5 +364,44 @@ public class BillingService {
         BillInvoice saved = billInvoiceRepository.save(billInvoice);
 
         return billingMapper.invoicetoInvoiceDetailResponse(saved);
+    }
+
+    @Transactional
+    public void markInvoicePaid(PaymentCompletedEvent event) {
+        BillInvoice billInvoice = billInvoiceRepository.findById(event.getInvoiceId())
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy hóa đơn ID: " + event.getInvoiceId()));
+
+        if ("PAID".equalsIgnoreCase(billInvoice.getStatus())) {
+            log.info("Hóa đơn ID={} đã ở trạng thái PAID, bỏ qua event trùng (transactionCode={}).",
+                    event.getInvoiceId(), event.getTransactionCode());
+            return;
+        }
+        if (!"UNPAID".equalsIgnoreCase(billInvoice.getStatus())) {
+            log.warn("Hóa đơn ID={} đang ở trạng thái {}, không thể gạch nợ.",
+                    event.getInvoiceId(), billInvoice.getStatus());
+            return;
+        }
+
+        billInvoice.setStatus(InvoiceStatus.PAID.name());
+        billInvoice.setPaymentDate(event.getPaidAt() != null ? event.getPaidAt() : LocalDateTime.now());
+        billInvoiceRepository.save(billInvoice);
+        log.info("Đã gạch nợ hóa đơn ID={} sang PAID (transactionCode={}).",
+                event.getInvoiceId(), event.getTransactionCode());
+    }
+
+    private String fetchRoomNumberQuietly(Long roomId) {
+        if (roomId == null) {
+            return null;
+        }
+        try {
+            RoomSummary room = propertyServiceRestClient.get()
+                    .uri("/api/v1/rooms/{id}", roomId)
+                    .retrieve()
+                    .body(RoomSummary.class);
+            return room != null ? room.roomNumber() : null;
+        } catch (Exception ex) {
+            log.warn("Không lấy được roomNumber cho roomId={} khi tạo hóa đơn cọc: {}", roomId, ex.getMessage());
+            return null;
+        }
     }
 }

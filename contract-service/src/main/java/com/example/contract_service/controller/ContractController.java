@@ -47,6 +47,7 @@ public class ContractController {
     }
 
     @GetMapping
+    @PreAuthorize("hasRole('LANDLORD')")
     public ResponseEntity<PageResponse<ContractResponse>> getContracts(
             @RequestParam(required = false)  String search,
             @RequestParam(required = false)  String status,

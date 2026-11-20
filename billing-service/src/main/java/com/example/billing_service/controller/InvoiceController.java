@@ -25,9 +25,11 @@ public class InvoiceController {
     private final BillingService billingService;
 
     @GetMapping("{id}")
-    @PreAuthorize("hasAnyRole('LANDLORD')")
-    public ResponseEntity<InvoiceDetailResponse> getInvoice(@PathVariable long id){
-        return ResponseEntity.ok(billingService.getTotalAmount(id));
+    @PreAuthorize("hasAnyRole('LANDLORD', 'TENANT')")
+    public ResponseEntity<InvoiceDetailResponse> getInvoice(
+            @PathVariable long id,
+            @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(billingService.getInvoiceForUser(id, jwt));
     }
 
     @PatchMapping("{id}/status")

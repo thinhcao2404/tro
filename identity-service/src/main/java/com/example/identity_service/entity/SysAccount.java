@@ -35,6 +35,13 @@ public class SysAccount {
     @Column(name = "tenant_id")
     private Long tenantId;
 
+    @Column(name = "email", length = 100)
+    private String email;
+
+    @Column(name = "must_change_password")
+    @Builder.Default
+    private Boolean mustChangePassword = false;
+
     @Column(name = "is_active", nullable = false)
     @Builder.Default
     private Boolean isActive = true;

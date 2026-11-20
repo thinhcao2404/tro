@@ -15,5 +15,6 @@ public class TenantResponse {
     String fullName;
     String phone;
     String identityNumber;
+    String email;
     LocalDateTime createdAt;
 }

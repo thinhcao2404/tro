@@ -8,6 +8,8 @@ public interface TenantRepository  extends JpaRepository <TenantProfile,Long>,
         JpaSpecificationExecutor<TenantProfile> {
     boolean existsByIdentityNumber(String identityNumber);
     boolean existsByPhone(String phone);
+    boolean existsByEmail(String email);
     boolean existsByPhoneAndIdNot(String phone, Long id);
     boolean existsByIdentityNumberAndIdNot(String identityNumber, Long id);
+    boolean existsByEmailAndIdNot(String email, Long id);
 }
