@@ -13,4 +13,5 @@ public class CreateTenantAccountRequest {
     String username;
     String fullName;
     Long tenantId;
+    String email;
 }

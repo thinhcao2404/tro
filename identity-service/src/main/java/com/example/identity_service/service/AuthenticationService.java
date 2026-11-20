@@ -1,5 +1,6 @@
 package com.example.identity_service.service;
 
+import com.example.identity_service.dto.request.ChangePasswordRequest;
 import com.example.identity_service.dto.request.LoginRequest;
 import com.example.identity_service.dto.request.RefreshTokenRequest;
 import com.example.identity_service.dto.response.AuthResponse;
@@ -111,5 +112,23 @@ public class AuthenticationService {
 
         refreshToken.setIsRevoked(true);
         refreshTokenRepository.save(refreshToken);
+    }
+
+    @Transactional
+    public void changePassword(String username, ChangePasswordRequest request) {
+        SysAccount sysAccount = sysAccountRepository.findByUsername(username)
+                .orElseThrow(() -> new BadRequestException("Tài khoản không tồn tại."));
+
+        if (!passwordEncoder.matches(request.getOldPassword(), sysAccount.getPasswordHash())) {
+            throw new BadRequestException("Mật khẩu hiện tại không chính xác.");
+        }
+        if (request.getOldPassword().equals(request.getNewPassword())) {
+            throw new BadRequestException("Mật khẩu mới phải khác mật khẩu hiện tại.");
+        }
+
+        sysAccount.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
+        sysAccount.setMustChangePassword(false);
+        sysAccountRepository.save(sysAccount);
+        refreshTokenRepository.deleteByAccount(sysAccount);
     }
 }

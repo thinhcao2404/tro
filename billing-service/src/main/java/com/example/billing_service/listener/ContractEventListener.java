@@ -9,31 +9,25 @@ import org.springframework.amqp.AmqpRejectAndDontRequeueException;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Component;
-import tools.jackson.core.JacksonException;
-import tools.jackson.databind.ObjectMapper;
 
 @Component
 @RequiredArgsConstructor
 @Slf4j
 public class ContractEventListener {
 
-    private final ObjectMapper objectMapper;
     private final BillingService billingService;
 
     @RabbitListener(queues = RabbitMQConfig.CONTRACT_QUEUE)
-    public void receiveContractCreatedMessage(String messagePayload) {
-        log.info("Nhận message từ RabbitMQ: {}", messagePayload);
+    public void receiveContractCreatedMessage(ContractCreatedEvent event) {
+        log.info("Nhận ContractCreatedEvent từ RabbitMQ: {}", event);
 
         try {
-            ContractCreatedEvent event = objectMapper.readValue(messagePayload, ContractCreatedEvent.class);
             billingService.createDepositInvoice(event);
-        } catch (JacksonException | IllegalArgumentException e) {
-            log.error("Payload không hợp lệ, từ chối message: {}", e.getMessage());
+        } catch (IllegalArgumentException e) {
+            log.error("Payload không hợp lệ, chuyển message sang DLQ: {}", e.getMessage());
             throw new AmqpRejectAndDontRequeueException("Invalid ContractCreatedEvent payload", e);
         } catch (DataIntegrityViolationException e) {
-            // Đóng race condition
-            log.warn("Hóa đơn cọc đã tồn tại , bỏ qua: {}", e.getMessage());
+            log.warn("Hóa đơn cọc đã tồn tại, bỏ qua: {}", e.getMessage());
         }
     }
-
 }

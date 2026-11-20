@@ -13,4 +13,5 @@ public class UpdateTenantAccountRequest {
     Long tenantId;
     String fullName;
     String oldUsername;
+    String email;
 }

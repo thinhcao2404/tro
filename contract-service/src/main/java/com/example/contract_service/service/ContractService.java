@@ -1,5 +1,8 @@
 package com.example.contract_service.service;
 
+import com.example.contract_service.config.RabbitMQConfig;
+import com.example.contract_service.dto.ContractCreatedEvent;
+import com.example.contract_service.dto.ContractCreatedEvent;
 import com.example.contract_service.dto.request.ContractCreateRequest;
 import com.example.contract_service.dto.response.ContractResponse;
 import com.example.contract_service.dto.response.PageResponse;
@@ -13,7 +16,8 @@ import com.example.contract_service.mapper.ContractMapper;
 import com.example.contract_service.repository.ContractRepository;
 import com.example.contract_service.util.PageResponseUtil;
 import lombok.RequiredArgsConstructor;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -34,11 +38,12 @@ import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class ContractService {
     private final ContractRepository contractRepository;
     private final RestClient restClient;
     private final ContractMapper contractMapper;
-    private final RabbitTemplate rabbitTemplate;
+    private final ApplicationEventPublisher eventPublisher;
 
     public ContractAgreement  findContractAgreementById(Long id){
         return contractRepository.findById(id).
@@ -135,20 +140,11 @@ public class ContractService {
         contractAgreement.setEndDate(LocalDate.now());
         contractRepository.save(contractAgreement);
 
-        try {
-            restClient.patch()
-                    .uri("/api/v1/rooms/internal/{roomId}/status", contractAgreement.getRoomId())
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .body(Map.of("status", "AVAILABLE"))
-                    .retrieve()
-                    .toBodilessEntity();
-        } catch (ResourceAccessException e) {
-            throw new ServiceUnavailableException("Dịch vụ quản lý phòng hiện không khả dụng. Vui lòng thử lại sau.");
-        } catch (RestClientResponseException e) {
-            throw new ExternalServiceException("Lỗi phản hồi từ property-service: " + e.getResponseBodyAsString());
-        } catch (RestClientException e) {
-            throw new ExternalServiceException("Lỗi giao tiếp với dịch vụ quản lý phòng");
-        }
+        updateRoomStatus(
+                contractAgreement.getRoomId(),
+                "AVAILABLE",
+                "Lỗi giao tiếp với dịch vụ quản lý phòng"
+        );
         return contractMapper.contractToContractResponse(contractAgreement);
     }
 
@@ -182,21 +178,34 @@ public class ContractService {
         contractAgreement.setStatus(ContractStatus.ACTIVE);
         ContractAgreement savedContract = contractRepository.save(contractAgreement);
 
+        updateRoomStatus(contractAgreement.getRoomId(), "OCCUPIED", "Không thể cập nhật trạng thái phòng sang OCCUPIED.");
+
+        ContractCreatedEvent event = ContractCreatedEvent.builder()
+                .contractId(savedContract.getId())
+                .roomId(savedContract.getRoomId())
+                .tenantId(savedContract.getTenantId())
+                .deposit(savedContract.getDeposit() != null ? savedContract.getDeposit() : BigDecimal.ZERO)
+                .startDate(savedContract.getStartDate())
+                .build();
+        eventPublisher.publishEvent(event);
+
+        return contractMapper.contractToContractResponse(savedContract);
+    }
+
+    private void updateRoomStatus(Long roomId, String status, String genericErrorMessage) {
         try {
             restClient.patch()
-                    .uri("/api/v1/rooms/internal/{roomId}/status", contractAgreement.getRoomId())
+                    .uri("/api/v1/rooms/internal/{roomId}/status", roomId)
                     .contentType(MediaType.APPLICATION_JSON)
-                    .body(Map.of("status", "OCCUPIED"))
+                    .body(Map.of("status", status))
                     .retrieve()
                     .toBodilessEntity();
-        }catch (ResourceAccessException e) {
+        } catch (ResourceAccessException e) {
             throw new ServiceUnavailableException("Dịch vụ quản lý phòng hiện không khả dụng. Vui lòng thử lại sau.");
         } catch (RestClientResponseException e) {
             throw new ExternalServiceException("Lỗi phản hồi từ property-service: " + e.getResponseBodyAsString());
         } catch (RestClientException e) {
-            throw new ExternalServiceException("Không thể cập nhật trạng thái phòng sang OCCUPIED.");
+            throw new ExternalServiceException(genericErrorMessage);
         }
-        rabbitTemplate.convertAndSend(savedContract);
-        return contractMapper.contractToContractResponse(savedContract);
     }
 }

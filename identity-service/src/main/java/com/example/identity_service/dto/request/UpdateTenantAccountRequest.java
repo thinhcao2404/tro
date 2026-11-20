@@ -1,5 +1,6 @@
 package com.example.identity_service.dto.request;
 
+import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
@@ -16,5 +17,8 @@ public class UpdateTenantAccountRequest {
     String username;
     @NotBlank(message = "Họ tên không được để trống")
     String fullName;
+
+    @Email(message = "Email không đúng định dạng")
+    String email;
 
 }

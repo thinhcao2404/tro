@@ -14,19 +14,25 @@ import com.example.tenant_service.mapper.TenantMapper;
 import com.example.tenant_service.repository.TenantRepository;
 import com.example.tenant_service.util.PageResponseUtil;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatusCode;
+import org.springframework.http.client.ClientHttpResponse;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 
+
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class TenantService {
@@ -123,10 +129,15 @@ public class TenantService {
             throw new BadRequestException("Số CCCD này đã được sử dụng bởi khách thuê khác.");
         }
 
+        if (tenantRepository.existsByEmailAndIdNot(request.getEmail(), id)) {
+            throw new BadRequestException("Email này đã được sử dụng bởi khách thuê khác.");
+        }
+
         String oldUserName = tenantProfile.getPhone();
         tenantProfile.setFullName(request.getFullName());
         tenantProfile.setPhone(request.getPhone());
         tenantProfile.setIdentityNumber(request.getIdentityNumber());
+        tenantProfile.setEmail(request.getEmail());
         TenantProfile savedTenant = tenantRepository.save(tenantProfile);
 
             UpdateTenantAccountRequest updateTenantAccountRequest = UpdateTenantAccountRequest.builder()
@@ -134,6 +145,7 @@ public class TenantService {
                     .fullName(request.getFullName())
                     .tenantId(savedTenant.getId())
                     .oldUsername(oldUserName)
+                    .email(savedTenant.getEmail())
                     .build();
 
         try{
@@ -142,10 +154,14 @@ public class TenantService {
                     .body(updateTenantAccountRequest)
                     .retrieve()
                     .onStatus(HttpStatusCode::is4xxClientError, (req, res) -> {
-                        throw new BadRequestException("Đồng bộ tài khoản thất bại: Thông tin gửi sang Identity Service không hợp lệ.");
+                        String body = readErrorBody(res);
+                        log.warn("Identity Service trả lỗi {} khi cập nhật tài khoản: {}", res.getStatusCode(), body);
+                        throw new BadRequestException("Đồng bộ tài khoản thất bại (" + res.getStatusCode().value() + "): " + body);
                     })
                     .onStatus(HttpStatusCode::is5xxServerError, (req, res) -> {
-                        throw new RuntimeException("Hệ thống Identity Service gặp sự cố.");
+                        String body = readErrorBody(res);
+                        log.error("Identity Service lỗi {} khi cập nhật tài khoản: {}", res.getStatusCode(), body);
+                        throw new ExternalServiceException("Hệ thống Identity Service gặp sự cố (" + res.getStatusCode().value() + "): " + body);
                     })
                     .toBodilessEntity();
         } catch (ResourceAccessException e){
@@ -192,17 +208,20 @@ public class TenantService {
     public TenantResponse createTenant(TenantRequest request) {
 
         if (tenantRepository.existsByIdentityNumber(request.getIdentityNumber()) ||
-                tenantRepository.existsByPhone(request.getPhone())) {
-            throw new BadRequestException("Số điện thoại hoặc CCCD này đã tồn tại trong hệ thống.");
+                tenantRepository.existsByPhone(request.getPhone()) ||
+                tenantRepository.existsByEmail(request.getEmail())) {
+            throw new BadRequestException("Số điện thoại, CCCD hoặc Email này đã tồn tại trong hệ thống.");
         }
 
         TenantProfile tenant = tenantMapper.toTenant(request);
+        tenant.setEmail(request.getEmail());
         TenantProfile savedTenant = tenantRepository.save(tenant);
 
         CreateTenantAccountRequest accountRequest = CreateTenantAccountRequest.builder()
                 .tenantId(savedTenant.getId())
                 .username(savedTenant.getPhone())
                 .fullName(savedTenant.getFullName())
+                .email(savedTenant.getEmail())
                 .build();
         try{
             identityRestClient.post()
@@ -210,10 +229,14 @@ public class TenantService {
                     .body(accountRequest)
                     .retrieve()
                     .onStatus(HttpStatusCode::is4xxClientError, (req, res) -> {
-                        throw new BadRequestException("Tạo tài khoản thất bại: Thông tin gửi sang Identity Service không hợp lệ.");
+                        String body = readErrorBody(res);
+                        log.warn("Identity Service trả lỗi {} khi tạo tài khoản: {}", res.getStatusCode(), body);
+                        throw new BadRequestException("Tạo tài khoản thất bại (" + res.getStatusCode().value() + "): " + body);
                     })
                     .onStatus(HttpStatusCode::is5xxServerError, (req, res) -> {
-                        throw new RuntimeException("Hệ thống Identity Service gặp sự cố.");
+                        String body = readErrorBody(res);
+                        log.error("Identity Service lỗi {} khi tạo tài khoản: {}", res.getStatusCode(), body);
+                        throw new ExternalServiceException("Hệ thống Identity Service gặp sự cố (" + res.getStatusCode().value() + "): " + body);
                     })
                     .toBodilessEntity();
         }catch (ResourceAccessException e) {
@@ -222,7 +245,15 @@ public class TenantService {
             throw new ExternalServiceException("Lỗi phản hồi từ Identity Service: " + e.getResponseBodyAsString());
         }
 
-
         return tenantMapper.toTenantResponse(savedTenant);
+    }
+
+    private String readErrorBody(ClientHttpResponse response) {
+        try {
+            String body = new String(response.getBody().readAllBytes(), StandardCharsets.UTF_8);
+            return body.isBlank() ? "(empty body)" : body;
+        } catch (IOException e) {
+            return "(unable to read body: " + e.getMessage() + ")";
+        }
     }
 }

@@ -14,7 +14,11 @@ public class RouteValidator {
 
     // Các endpoint công khai
     private static final List<String> OPEN_API_ENDPOINTS = List.of(
-            "/api/v1/auth/**",
+            "/api/v1/auth/login",
+            "/api/v1/auth/refresh",
+            "/api/v1/auth/logout",
+            "/api/v1/payments/vnpay-ipn",
+            "/api/v1/payments/vnpay-return",
             "/eureka/**",
             "/actuator/**"
     );
@@ -23,13 +27,11 @@ public class RouteValidator {
         String path = request.getURI().getPath();
         HttpMethod method = request.getMethod();
 
-
         for (String openEndpoint : OPEN_API_ENDPOINTS) {
             if (pathMatcher.match(openEndpoint, path)) {
                 return false;
             }
         }
-
 
         if (HttpMethod.GET.equals(method) && pathMatcher.match("/api/v1/rooms/**", path)) {
             return false;

@@ -33,6 +33,9 @@ public class TenantProfile {
     @Column(name = "identity_number", nullable = false, unique = true, length = 20)
     String identityNumber;
 
+    @Column(name = "email", unique = true, length = 100)
+    String email;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     LocalDateTime createdAt;

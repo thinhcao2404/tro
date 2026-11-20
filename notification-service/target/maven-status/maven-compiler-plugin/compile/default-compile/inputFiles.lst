@@ -1,0 +1,9 @@
+C:\Users\ACER\Downloads\tro\notification-service\src\main\java\com\example\notification_service\config\RabbitMQConfig.java
+C:\Users\ACER\Downloads\tro\notification-service\src\main\java\com\example\notification_service\dto\AccountCreatedEmailEvent.java
+C:\Users\ACER\Downloads\tro\notification-service\src\main\java\com\example\notification_service\entity\NotificationLog.java
+C:\Users\ACER\Downloads\tro\notification-service\src\main\java\com\example\notification_service\enums\NotificationChannel.java
+C:\Users\ACER\Downloads\tro\notification-service\src\main\java\com\example\notification_service\enums\NotificationStatus.java
+C:\Users\ACER\Downloads\tro\notification-service\src\main\java\com\example\notification_service\listener\AccountNotificationListener.java
+C:\Users\ACER\Downloads\tro\notification-service\src\main\java\com\example\notification_service\NotificationServiceApplication.java
+C:\Users\ACER\Downloads\tro\notification-service\src\main\java\com\example\notification_service\repository\NotificationLogRepository.java
+C:\Users\ACER\Downloads\tro\notification-service\src\main\java\com\example\notification_service\service\EmailService.java
