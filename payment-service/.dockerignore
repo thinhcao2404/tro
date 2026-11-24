@@ -1,0 +1,8 @@
+﻿target/
+.mvn/
+.idea/
+.git/
+.env
+.env.*
+*.log
+*.iml
