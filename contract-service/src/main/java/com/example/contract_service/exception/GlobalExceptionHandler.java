@@ -2,6 +2,7 @@ package com.example.contract_service.exception;
 
 import com.example.contract_service.dto.response.ErrorResponse;
 import jakarta.servlet.http.HttpServletRequest;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -15,6 +16,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 @RestControllerAdvice
+@Slf4j
 public class GlobalExceptionHandler {
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> handleValidationExceptions(
@@ -77,6 +79,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ServiceUnavailableException.class)
     public ResponseEntity<ErrorResponse> handleServiceUnavailableException(
             ServiceUnavailableException ex, HttpServletRequest request) {
+        log.error("[503 Service Unavailable] {} {} - {}", request.getMethod(), request.getRequestURI(), ex.getMessage());
 
         ErrorResponse errorResponse = ErrorResponse.builder()
                 .timestamp(LocalDateTime.now())
@@ -92,6 +95,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ExternalServiceException.class)
     public ResponseEntity<ErrorResponse> handleExternalServiceException(
             ExternalServiceException ex, HttpServletRequest request) {
+        log.error("[500 External Service Error] {} {} - {}", request.getMethod(), request.getRequestURI(), ex.getMessage());
 
         ErrorResponse errorResponse = ErrorResponse.builder()
                 .timestamp(LocalDateTime.now())
@@ -107,6 +111,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleGlobalException(
             Exception ex, HttpServletRequest request) {
+        log.error("[500 Internal Server Error] {} {} - {}", request.getMethod(), request.getRequestURI(), ex.getMessage(), ex);
 
         ErrorResponse response = new ErrorResponse(
                 HttpStatus.INTERNAL_SERVER_ERROR.value(),
